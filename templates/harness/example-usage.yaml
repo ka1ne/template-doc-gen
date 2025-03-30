@@ -1,0 +1,34 @@
+pipeline:
+  name: Documentation Generation Pipeline
+  identifier: documentation_generation_pipeline
+  projectIdentifier: default
+  orgIdentifier: default
+  tags:
+    purpose: documentation
+  
+  stages:
+    - stage:
+        name: Generate Template Documentation
+        identifier: generate_template_documentation
+        # Reference to the template
+        template:
+          name: template-doc-gen
+          identifier: templatedocgen
+          versionLabel: v0.0.1-alpha
+        # Provide values for the template variables
+        variables:
+          # Required variable
+          docker_registry_connector: dockerhub_connector
+          
+          # Optional variables with custom values
+          image_name: ka1ne/template-doc-gen:0.0.1-alpha
+          source_dir: templates
+          output_dir: docs/output
+          
+          # Enable Confluence publishing
+          publish_to_confluence: true
+          confluence_url_secret: confluence_url
+          confluence_username_secret: confluence_username
+          confluence_token_secret: confluence_token
+          confluence_space_secret: confluence_space
+          confluence_parent_id_secret: confluence_parent_id 

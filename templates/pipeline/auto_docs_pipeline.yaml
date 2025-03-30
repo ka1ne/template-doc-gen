@@ -51,7 +51,7 @@ pipeline:
       type: string
       description: Docker image name for documentation generator
       required: false
-      default: harness-template-docs:latest
+      default: ka1ne/template-doc-gen:0.0.1-alpha
     source_dir:
       type: string
       description: Source directory containing templates
@@ -201,6 +201,6 @@ examples:
         git_connector: github_app_connector
         repo_name: harness-templates
         branch_name: main
-        image_name: harness/template-docs:latest
+        image_name: ka1ne/template-doc-gen:0.0.1-alpha
         publish_to_confluence: true
         email_notification_list: team@example.com,docs@example.com 

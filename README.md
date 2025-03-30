@@ -9,28 +9,33 @@ This documentation generator analyzes Harness YAML templates and creates organiz
 2. Generating HTML documentation with search and filtering 
 3. Publishing to Confluence (optional)
 
-## Using the Stage Template
+## Using the Harness Stage Template
 
 This project provides a ready-to-use Harness stage template that you can add to any pipeline.
 
-### 1. Add the Template to Your Harness Project
+### 1. Import the Stage Template
 
 Copy the stage template to your Harness project:
-- Source file: `templates/stage/docs_generator_stage.yaml`
-- Import it through the Harness UI or CLI
+- Source file: `templates/harness/template-doc-gen.yaml`
+- Import it through the Harness UI or API
 
 ### 2. Add the Stage to Your Pipeline
 
 ```yaml
 stages:
   - stage:
+      name: Generate Template Documentation
+      identifier: generate_template_documentation
       template:
-        name: Documentation Generator Stage
-        identifier: docs_generator_stage
-        versionLabel: 1.0.0
+        name: template-doc-gen
+        identifier: templatedocgen
+        versionLabel: v0.0.1-alpha
       variables:
+        # Required variable
         docker_registry_connector: your_docker_connector_id
-        image_name: harness-template-docs:latest
+        
+        # Optional variables with custom values
+        image_name: ka1ne/template-doc-gen:0.0.1-alpha
         source_dir: templates
         output_dir: docs/templates
 ```
@@ -40,15 +45,17 @@ stages:
 ```yaml
 stages:
   - stage:
+      name: Generate Template Documentation
+      identifier: generate_template_documentation
       template:
-        name: Documentation Generator Stage
-        identifier: docs_generator_stage
-        versionLabel: 1.0.0
+        name: template-doc-gen
+        identifier: templatedocgen
+        versionLabel: v0.0.1-alpha
       variables:
+        # Required variable
         docker_registry_connector: your_docker_connector_id
-        image_name: harness-template-docs:latest
-        source_dir: templates
-        output_dir: docs/templates
+        
+        # Confluence publishing options
         publish_to_confluence: true
         confluence_url_secret: confluence_url
         confluence_username_secret: confluence_username
@@ -57,63 +64,21 @@ stages:
         confluence_parent_id_secret: confluence_parent_id
 ```
 
-## Complete Pipeline with Git Webhook Trigger
+### 4. Configure Secrets
 
-For automatic documentation generation when code is merged to the main branch, use our complete pipeline template that includes:
+Create the following secrets in your Harness project if using Confluence:
+- `confluence_url`
+- `confluence_username`
+- `confluence_token`
+- `confluence_space`
+- `confluence_parent_id`
 
-- **Git Webhook Trigger**: Automatically runs when code is merged to main
-- **Documentation Generator Stage**: Generates and publishes documentation
-- **Email Notifications**: Sends success/failure notifications to your team
-- **Pipeline Variables**: Customizable settings for your environment
+## Complete Pipeline Example
 
-### Implementation Steps
-
-1. **Add the Pipeline Template**:
-   - Copy `templates/pipeline/auto_docs_pipeline.yaml` to your Harness project
-   - Import it through the Harness UI or CLI
-
-2. **Configure Pipeline Variables**:
-
-   ```yaml
-   pipeline:
-     name: Template Documentation
-     identifier: template_documentation_with_trigger
-     variables:
-       docker_registry_connector: your_docker_connector
-       git_connector: your_github_connector
-       repo_name: your-template-repo
-       branch_name: main
-       publish_to_confluence: true
-       email_notification_list: team@example.com
-   ```
-
-3. **Set Up Secrets**:
-   Configure the following secrets in your Harness project:
-   - `confluence_url`
-   - `confluence_username`
-   - `confluence_token`
-   - `confluence_space`
-   - `confluence_parent_id`
-
-4. **Verify Webhook Configuration**:
-   - Ensure your Git connector has webhook permissions
-   - Check that the repository sends webhook events to Harness
-
-### How It Works
-
-1. When code is merged to the main branch, GitHub sends a webhook event to Harness
-2. The pipeline trigger detects the push event to the main branch
-3. The pipeline executes the documentation generator stage
-4. Documentation is generated and published to Confluence
-5. Email notifications are sent with the results
-
-### Key Features
-
-- **Automatic Execution**: No manual triggering required
-- **Branch Filtering**: Only runs on merges to the main branch (configurable)
-- **Email Notifications**: Keeps your team informed of documentation updates
-- **Fail-Safe Design**: Proper error handling and notifications
-- **Customizable**: All aspects can be adjusted through variables
+A complete pipeline example can be found at `templates/harness/example-usage.yaml` which includes:
+- The documentation generator stage
+- Configurable variables for customization
+- Example usage patterns
 
 ## Stage Template Variables
 
@@ -128,7 +93,7 @@ For automatic documentation generation when code is merged to the main branch, u
 | `confluence_token_secret` | Secret for Confluence API token | | No |
 | `confluence_space_secret` | Secret for Confluence space key | | No |
 | `confluence_parent_id_secret` | Secret for Confluence parent page ID | | No |
-| `image_name` | Docker image name | `harness-template-docs:latest` | No |
+| `image_name` | Docker image name | `ka1ne/template-doc-gen:0.0.1-alpha` | No |
 | `docker_registry_connector` | Connector ID for Docker registry | | Yes |
 
 ## Local Development
@@ -152,7 +117,7 @@ cp .env.example .env
 # Using helper script
 ./publish-to-confluence.sh
 
-# Or using Python directly
+# Using Python directly
 python process_template.py --source templates --output docs/templates --format html
 ```
 
@@ -160,10 +125,10 @@ python process_template.py --source templates --output docs/templates --format h
 
 ```bash
 # Build container
-docker build -t harness-template-docs .
+docker build -t ka1ne/template-doc-gen:0.0.1-alpha .
 
 # Run with volume mounts
-docker run -v $(pwd)/templates:/app/templates -v $(pwd)/docs:/app/docs harness-template-docs --verbose
+docker run -v $(pwd)/templates:/app/templates -v $(pwd)/docs:/app/docs ka1ne/template-doc-gen:0.0.1-alpha --verbose
 ```
 
 ## Template Requirements

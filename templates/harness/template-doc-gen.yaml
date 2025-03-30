@@ -1,0 +1,106 @@
+template:
+  name: template-doc-gen
+  identifier: templatedocgen
+  versionLabel: v0.0.1-alpha
+  type: Stage
+  projectIdentifier: default
+  orgIdentifier: default
+  description: Generates and publishes documentation from Harness templates to Confluence
+  tags:
+    category: Documentation
+    technology: Python
+  
+  stageTemplate:
+    type: CI
+    variables:
+      - name: source_dir
+        type: String
+        description: Source directory containing templates
+        required: false
+        value: templates
+      - name: output_dir
+        type: String
+        description: Output directory for generated documentation
+        required: false
+        value: docs/templates
+      - name: format
+        type: String
+        description: Output format for documentation (html, markdown, json)
+        required: false
+        value: html
+      - name: publish_to_confluence
+        type: Boolean
+        description: Whether to publish documentation to Confluence
+        required: false
+        value: false
+      - name: confluence_url_secret
+        type: String
+        description: Secret identifier for Confluence URL
+        required: false
+      - name: confluence_username_secret
+        type: String
+        description: Secret identifier for Confluence username
+        required: false
+      - name: confluence_token_secret
+        type: String
+        description: Secret identifier for Confluence API token
+        required: false
+      - name: confluence_space_secret
+        type: String
+        description: Secret identifier for Confluence space key
+        required: false
+      - name: confluence_parent_id_secret
+        type: String
+        description: Secret identifier for Confluence parent page ID
+        required: false
+      - name: image_name
+        type: String
+        description: Docker image name for documentation generator
+        required: false
+        value: ka1ne/template-doc-gen:0.0.1-alpha
+      - name: docker_registry_connector
+        type: String
+        description: Connector ID for Docker registry
+        required: true
+    
+    spec:
+      cloneCodebase: true
+      execution:
+        steps:
+          - step:
+              type: Run
+              name: Generate Documentation
+              identifier: generate_documentation
+              spec:
+                connectorRef: <+stage.variables.docker_registry_connector>
+                image: <+stage.variables.image_name>
+                command: |
+                  python process_template.py \
+                    --source <+stage.variables.source_dir> \
+                    --output <+stage.variables.output_dir> \
+                    --format <+stage.variables.format> \
+                    <+stage.variables.publish_to_confluence == true ? "--publish" : ""> \
+                    <+stage.variables.confluence_url_secret != null ? "--confluence-url " + secrets.getValue(stage.variables.confluence_url_secret) : ""> \
+                    <+stage.variables.confluence_username_secret != null ? "--confluence-username " + secrets.getValue(stage.variables.confluence_username_secret) : ""> \
+                    <+stage.variables.confluence_token_secret != null ? "--confluence-token " + secrets.getValue(stage.variables.confluence_token_secret) : ""> \
+                    <+stage.variables.confluence_space_secret != null ? "--confluence-space " + secrets.getValue(stage.variables.confluence_space_secret) : ""> \
+                    <+stage.variables.confluence_parent_id_secret != null ? "--confluence-parent-id " + secrets.getValue(stage.variables.confluence_parent_id_secret) : ""> \
+                    --verbose
+                privileged: false
+                shell: Sh
+                envVariables:
+                  PYTHONUNBUFFERED: "1"
+                resources:
+                  limits:
+                    memory: 512Mi
+                    cpu: 500m
+      platform:
+        os: Linux
+        arch: Amd64
+      runtime:
+        type: Cloud
+        spec: {}
+      caching:
+        enabled: true
+        paths:
+          - <+stage.variables.output_dir> 
