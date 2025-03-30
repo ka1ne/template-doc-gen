@@ -57,14 +57,63 @@ stages:
         confluence_parent_id_secret: confluence_parent_id
 ```
 
-### 4. Configure Secrets
+## Complete Pipeline with Git Webhook Trigger
 
-Create the following secrets in your Harness project if using Confluence:
-- `confluence_url`
-- `confluence_username`
-- `confluence_token`
-- `confluence_space`
-- `confluence_parent_id`
+For automatic documentation generation when code is merged to the main branch, use our complete pipeline template that includes:
+
+- **Git Webhook Trigger**: Automatically runs when code is merged to main
+- **Documentation Generator Stage**: Generates and publishes documentation
+- **Email Notifications**: Sends success/failure notifications to your team
+- **Pipeline Variables**: Customizable settings for your environment
+
+### Implementation Steps
+
+1. **Add the Pipeline Template**:
+   - Copy `templates/pipeline/auto_docs_pipeline.yaml` to your Harness project
+   - Import it through the Harness UI or CLI
+
+2. **Configure Pipeline Variables**:
+
+   ```yaml
+   pipeline:
+     name: Template Documentation
+     identifier: template_documentation_with_trigger
+     variables:
+       docker_registry_connector: your_docker_connector
+       git_connector: your_github_connector
+       repo_name: your-template-repo
+       branch_name: main
+       publish_to_confluence: true
+       email_notification_list: team@example.com
+   ```
+
+3. **Set Up Secrets**:
+   Configure the following secrets in your Harness project:
+   - `confluence_url`
+   - `confluence_username`
+   - `confluence_token`
+   - `confluence_space`
+   - `confluence_parent_id`
+
+4. **Verify Webhook Configuration**:
+   - Ensure your Git connector has webhook permissions
+   - Check that the repository sends webhook events to Harness
+
+### How It Works
+
+1. When code is merged to the main branch, GitHub sends a webhook event to Harness
+2. The pipeline trigger detects the push event to the main branch
+3. The pipeline executes the documentation generator stage
+4. Documentation is generated and published to Confluence
+5. Email notifications are sent with the results
+
+### Key Features
+
+- **Automatic Execution**: No manual triggering required
+- **Branch Filtering**: Only runs on merges to the main branch (configurable)
+- **Email Notifications**: Keeps your team informed of documentation updates
+- **Fail-Safe Design**: Proper error handling and notifications
+- **Customizable**: All aspects can be adjusted through variables
 
 ## Stage Template Variables
 

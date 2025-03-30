@@ -1,0 +1,206 @@
+name: Template Documentation Pipeline with Trigger
+description: Complete pipeline for automatically generating and publishing documentation from Harness templates when code is merged to main
+type: pipeline
+author: Harness Team
+version: 1.0.0
+tags:
+  - documentation
+  - confluence
+  - templates
+  - automation
+  - webhook
+
+pipeline:
+  name: Template Documentation
+  identifier: template_documentation_with_trigger
+  projectIdentifier: <+project.identifier>
+  orgIdentifier: <+org.identifier>
+  tags:
+    purpose: "documentation"
+    type: "automated"
+  
+  properties:
+    ci:
+      codebase:
+        connectorRef: <+pipeline.variables.git_connector>
+        repoName: <+pipeline.variables.repo_name>
+        build: <+input>
+      modules:
+        - name: Documentation
+          path: ./
+  
+  variables:
+    docker_registry_connector:
+      type: string
+      description: Connector ID for Docker registry
+      required: true
+    git_connector:
+      type: string
+      description: Connector ID for Git repository
+      required: true
+    repo_name:
+      type: string
+      description: Name of the repository containing Harness templates
+      required: true
+    branch_name:
+      type: string
+      description: Branch to monitor for documentation generation
+      required: false
+      default: main
+    image_name:
+      type: string
+      description: Docker image name for documentation generator
+      required: false
+      default: harness-template-docs:latest
+    source_dir:
+      type: string
+      description: Source directory containing templates
+      required: false
+      default: templates
+    output_dir:
+      type: string
+      description: Output directory for generated documentation
+      required: false
+      default: docs/templates
+    publish_to_confluence:
+      type: boolean
+      description: Whether to publish documentation to Confluence
+      required: false
+      default: true
+    email_notification_list:
+      type: string
+      description: Comma-separated list of emails to notify on success/failure
+      required: false
+      default: ""
+
+  stages:
+    - stage:
+        name: Generate and Publish Documentation
+        identifier: generate_and_publish_documentation
+        description: Generate documentation from templates and publish to Confluence
+        template:
+          name: Documentation Generator Stage
+          identifier: docs_generator_stage
+          versionLabel: 1.0.0
+        variables:
+          docker_registry_connector: <+pipeline.variables.docker_registry_connector>
+          image_name: <+pipeline.variables.image_name>
+          source_dir: <+pipeline.variables.source_dir>
+          output_dir: <+pipeline.variables.output_dir>
+          publish_to_confluence: <+pipeline.variables.publish_to_confluence>
+          confluence_url_secret: "confluence_url"
+          confluence_username_secret: "confluence_username"
+          confluence_token_secret: "confluence_token"
+          confluence_space_secret: "confluence_space"
+          confluence_parent_id_secret: "confluence_parent_id"
+    
+    - stage:
+        name: Notify Team
+        identifier: notify_team
+        description: Send notification of documentation update results
+        type: Notification
+        spec:
+          execution:
+            steps:
+              - step:
+                  type: Email
+                  name: Email Documentation Update Results
+                  identifier: email_documentation_update_results
+                  spec:
+                    to: <+pipeline.variables.email_notification_list>
+                    cc: ""
+                    subject: "Documentation Update for <+pipeline.variables.repo_name> - <+pipeline.status>"
+                    body: |
+                      Documentation for <+pipeline.variables.repo_name> has been updated.
+                      
+                      Status: <+pipeline.status>
+                      Branch: <+pipeline.variables.branch_name>
+                      Trigger: <+pipeline.triggeredBy.name>
+                      
+                      Pipeline URL: <+pipeline.url>
+                      
+                      Generated documentation is available in Confluence.
+                  when:
+                    stageStatus: Success
+                    condition: <+pipeline.variables.email_notification_list != "">
+          
+  triggers:
+    - trigger:
+        name: Merge to Main
+        identifier: merge_to_main
+        description: Trigger documentation build when code is merged to main branch
+        enabled: true
+        type: Webhook
+        spec:
+          type: Github
+          spec:
+            connectorRef: <+pipeline.variables.git_connector>
+            repoName: <+pipeline.variables.repo_name>
+            events:
+              - Push
+            actions: []
+            payloadConditions:
+              - key: targetBranch
+                operator: Equals
+                value: refs/heads/<+pipeline.variables.branch_name>
+            headerConditions: []
+          autoAbortPreviousExecutions: true
+          actions:
+            - type: RunPipeline
+              spec:
+                description: Auto-triggered on merge to <+pipeline.variables.branch_name>
+                pipelineIdentifier: <+pipeline.identifier>
+                executionInputs:
+                  branch: <+pipeline.variables.branch_name>
+
+  notificationRules:
+    - name: On Pipeline Failure
+      identifier: on_pipeline_failure
+      pipelineEvents:
+        - type: PipelineFailure
+      notificationMethod:
+        type: Email
+        spec:
+          to: <+pipeline.variables.email_notification_list>
+          cc: ""
+          subject: "⚠️ Template Documentation Pipeline Failed"
+          body: |
+            The documentation generation pipeline for <+pipeline.variables.repo_name> has failed.
+            
+            Pipeline URL: <+pipeline.url>
+            Trigger: <+pipeline.triggeredBy.name>
+            Branch: <+pipeline.variables.branch_name>
+      
+    - name: On Pipeline Success
+      identifier: on_pipeline_success
+      pipelineEvents:
+        - type: PipelineSuccess
+      notificationMethod:
+        type: Email
+        spec:
+          to: <+pipeline.variables.email_notification_list>
+          cc: ""
+          subject: "✅ Template Documentation Updated Successfully"
+          body: |
+            The documentation for <+pipeline.variables.repo_name> has been successfully updated.
+            
+            Pipeline URL: <+pipeline.url>
+            Trigger: <+pipeline.triggeredBy.name>
+            Branch: <+pipeline.variables.branch_name>
+            
+            Documentation is now available in Confluence.
+
+examples:
+  - |
+    # Complete usage example with webhook trigger and notifications
+    pipeline:
+      name: Template Documentation
+      identifier: template_documentation_with_trigger
+      variables:
+        docker_registry_connector: dockerhub
+        git_connector: github_app_connector
+        repo_name: harness-templates
+        branch_name: main
+        image_name: harness/template-docs:latest
+        publish_to_confluence: true
+        email_notification_list: team@example.com,docs@example.com 
