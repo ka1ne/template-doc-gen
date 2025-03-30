@@ -1,0 +1,69 @@
+name: Deployment Approval Stage
+description: A stage template for managing deployment approvals with notifications and timeouts
+type: stage
+author: Release Management Team
+version: 2.0.0
+tags:
+  - approval
+  - governance
+  - deployment
+
+stage:
+  variables:
+    approvalGroup:
+      type: string
+      description: User group required for approval
+      required: true
+    timeoutHours:
+      type: number
+      description: Hours before approval times out
+      required: false
+    notificationChannel:
+      type: string
+      description: Slack channel for notifications
+      required: true
+
+  parameters:
+    autoApproveNonProd:
+      type: boolean
+      description: Automatically approve for non-production environments
+      default: false
+      required: false
+    requireComments:
+      type: boolean
+      description: Require comments for approval decisions
+      default: true
+      required: false
+    minApprovers:
+      type: number
+      description: Minimum number of approvers required
+      default: 1
+      required: true
+
+  steps:
+    - name: Send Notification
+      description: Notify approvers that approval is required
+    - name: Wait For Approval
+      description: Wait for the required approvals
+    - name: Process Approval Result
+      description: Handle approval or rejection
+    - name: Log Approval Details
+      description: Record approval details for audit purposes
+
+examples:
+  - |
+    # Example usage in pipeline
+    stages:
+      - stage:
+          template:
+            name: Deployment Approval Stage
+            identifier: deployment_approval_stage
+            versionLabel: 2.0.0
+          variables:
+            approvalGroup: release-managers
+            timeoutHours: 24
+            notificationChannel: #deployments
+          parameters:
+            autoApproveNonProd: true
+            requireComments: true
+            minApprovers: 2

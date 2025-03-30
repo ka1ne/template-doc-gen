@@ -1,0 +1,70 @@
+name: CI Pipeline Template
+description: A continuous integration pipeline template for building, testing, and deploying applications
+type: pipeline
+author: DevOps Team
+version: 1.1.0
+tags:
+  - CI/CD
+  - automation
+  - build
+
+pipeline:
+  variables:
+    repoUrl:
+      type: string
+      description: Git repository URL
+      required: true
+    branch:
+      type: string
+      description: Git branch to build
+      required: true
+    buildEnv:
+      type: string
+      description: Build environment (dev, staging, prod)
+      required: false
+
+  parameters:
+    buildImage:
+      type: string
+      description: Docker image to use for building
+      default: alpine:latest
+      required: true
+    cacheEnabled:
+      type: boolean
+      description: Enable build caching
+      default: true
+      required: false
+    testTimeout:
+      type: number
+      description: Test timeout in minutes
+      default: 15
+      required: false
+
+  stages:
+    - name: Checkout
+      description: Checkout code from repository
+    - name: Build
+      description: Build the application
+    - name: Test
+      description: Run automated tests
+    - name: Package
+      description: Package the application for deployment
+    - name: Deploy
+      description: Deploy to target environment
+
+examples:
+  - |
+    # Example usage in harness.yaml
+    pipeline:
+      template:
+        name: CI Pipeline Template
+        identifier: ci_pipeline_template
+        versionLabel: 1.1.0
+      variables:
+        repoUrl: https://github.com/myorg/myrepo.git
+        branch: main
+        buildEnv: dev
+      parameters:
+        buildImage: node:16-alpine
+        cacheEnabled: true
+        testTimeout: 20
