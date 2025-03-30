@@ -1,0 +1,52 @@
+template:
+  name: Security Scan Steps
+  identifier: Security_Scan_Steps
+  versionLabel: 2.0.1
+  type: StepGroup
+  projectIdentifier: default
+  orgIdentifier: default
+  description: "A set of steps for running security scans on code and containers"
+  author: "Security Team"
+  tags:
+    - security
+    - scan
+    - compliance
+  variables:
+    scanLevel:
+      description: "Level of scan to perform (basic, standard, deep)"
+      type: string
+      required: false
+      scope: stepgroup
+    reportPath:
+      description: "Path to save scan reports"
+      type: string
+      required: true
+      scope: stepgroup
+  parameters:
+    scanType:
+      description: "Type of scan to perform (code, container, both)"
+      type: string
+      required: true
+      default: both
+      scope: stepgroup
+    failOnHigh:
+      description: "Whether to fail the pipeline on high severity findings"
+      type: boolean
+      required: false
+      default: true
+      scope: stepgroup
+  examples:
+    - |
+      # Example usage in a stage
+      steps:
+        - stepGroup:
+            template:
+              name: Security Scan Steps
+              identifier: security_scan_steps
+              versionLabel: 2.0.1
+            variables:
+              scanLevel: standard
+              reportPath: reports/security/
+            parameters:
+              scanType: container
+              failOnHigh: true 
