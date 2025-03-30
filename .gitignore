@@ -63,3 +63,7 @@ coverage.xml
 
 # pyenv
 .python-version 
+
+# Generated documentation
+docs/output/
+docs/templates/ 

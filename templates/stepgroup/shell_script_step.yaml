@@ -1,0 +1,25 @@
+template:
+  name: Shell Script Step
+  identifier: Shell_Script_Step
+  versionLabel: 0.0.1
+  type: StepGroup
+  projectIdentifier: default
+  orgIdentifier: default
+  description: "Shell Script Template for testing"
+  tags:
+    - testing
+    - shell
+  spec:
+    type: ShellScript
+    timeout: 10m
+    spec:
+      shell: Bash
+      onDelegate: true
+      source:
+        type: Inline
+        spec:
+          script: |-
+            echo "Hello World"
+            echo "This is a test template"
+      environmentVariables: []
+      outputVariables: []
