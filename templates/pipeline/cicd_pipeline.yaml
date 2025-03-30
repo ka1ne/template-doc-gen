@@ -1,0 +1,125 @@
+template:
+  name: CI/CD Pipeline with Variables
+  identifier: CICD_Pipeline_with_Variables
+  versionLabel: 1.0.0
+  type: Pipeline
+  projectIdentifier: default
+  orgIdentifier: default
+  description: "A complete CI/CD pipeline template with build, test, and deploy stages"
+  author: "DevOps Team"
+  tags:
+    - cicd
+    - build
+    - deploy
+    - testing
+  variables:
+    gitRepo:
+      description: "Git repository URL"
+      type: string
+      required: true
+      scope: pipeline
+    dockerRegistry:
+      description: "Docker registry to push images to"
+      type: string
+      required: true
+      scope: pipeline
+    imageTag:
+      description: "Tag for the Docker image"
+      type: string
+      required: false
+      scope: pipeline
+    deployEnvironment:
+      description: "Environment to deploy to (dev, staging, prod)"
+      type: string
+      required: true
+      scope: pipeline
+  parameters:
+    runTests:
+      description: "Whether to run tests"
+      type: boolean
+      required: false
+      default: true
+      scope: pipeline
+    pushImage:
+      description: "Whether to push the image to registry"
+      type: boolean
+      required: false
+      default: true
+      scope: pipeline
+  spec:
+    stages:
+      - stage:
+          name: Build
+          identifier: Build
+          description: "Build Docker image"
+          type: CI
+          spec:
+            cloneCodebase: true
+            execution:
+              steps:
+                - step:
+                    type: Run
+                    name: Build Docker Image
+                    identifier: BuildDockerImage
+                    spec:
+                      shell: Bash
+                      command: |
+                        docker build -t ${dockerRegistry}/${gitRepo}:${imageTag} .
+      - stage:
+          name: Test
+          identifier: Test
+          description: "Run tests"
+          type: CI
+          spec:
+            execution:
+              steps:
+                - step:
+                    type: Run
+                    name: Run Tests
+                    identifier: RunTests
+                    spec:
+                      shell: Bash
+                      command: |
+                        echo "Running tests"
+                        # Add test commands here
+      - stage:
+          name: Deploy
+          identifier: Deploy
+          description: "Deploy to environment"
+          type: Deployment
+          spec:
+            deploymentType: Kubernetes
+            service:
+              serviceRef: <+input>
+              serviceInputs: <+input>
+            environment:
+              environmentRef: <+deployEnvironment>
+              deployToAll: false
+              infrastructureDefinitions: <+input>
+            execution:
+              steps:
+                - step:
+                    name: Deploy Application
+                    identifier: DeployApplication
+                    type: K8sRollingDeploy
+                    timeout: 10m
+                    spec:
+                      skipDryRun: false
+  examples:
+    - |
+      # Example usage of CI/CD pipeline
+      pipeline:
+        name: My App Pipeline
+        identifier: my_app_pipeline
+        template:
+          name: CI/CD Pipeline with Variables
+          identifier: CICD_Pipeline_with_Variables
+          versionLabel: 1.0.0
+        variables:
+          gitRepo: my-organization/my-app
+          dockerRegistry: docker.io/myorg
+          imageTag: <+GITHUB_SHA>
+          deployEnvironment: staging
+        parameters:
+          runTests: true
+          pushImage: true 

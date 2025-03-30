@@ -32,31 +32,23 @@ SOURCE_DIR=$(readlink -f "$SOURCE_DIR" || echo "templates")
 OUTPUT_DIR=$(readlink -f "$OUTPUT_DIR" || echo "docs/output") 
 
 echo "Starting Harness Template Documentation Generator..."
-echo "Using Docker image: ka1ne/template-doc-gen:0.0.1-alpha"
+echo "Using Docker image: ka1ne/template-doc-gen:0.0.3-alpha"
 echo "Source directory: $SOURCE_DIR"
 echo "Output directory: $OUTPUT_DIR"
-echo "Publishing to Confluence: $PUBLISH"
-echo "Space Key: $CONFLUENCE_SPACE_KEY"
-echo "Parent Page ID: $CONFLUENCE_PARENT_PAGE_ID"
 
 # Build the Docker command with explicit flags
 DOCKER_CMD="docker run --rm"
 DOCKER_CMD="$DOCKER_CMD -v \"$SOURCE_DIR:/app/templates\" -v \"$OUTPUT_DIR:/app/docs\""
 DOCKER_CMD="$DOCKER_CMD --env-file .env"
-DOCKER_CMD="$DOCKER_CMD ka1ne/template-doc-gen:0.0.1-alpha"
+DOCKER_CMD="$DOCKER_CMD ka1ne/template-doc-gen:0.0.3-alpha"
 
 # Add explicit flags based on .env settings
 if [ "$VERBOSE" = "true" ]; then
     DOCKER_CMD="$DOCKER_CMD --verbose"
 fi
 
-if [ "$PUBLISH" = "true" ]; then
-    DOCKER_CMD="$DOCKER_CMD --publish"
-    DOCKER_CMD="$DOCKER_CMD --confluence-url \"$CONFLUENCE_URL\""
-    DOCKER_CMD="$DOCKER_CMD --confluence-username \"$CONFLUENCE_USERNAME\""
-    DOCKER_CMD="$DOCKER_CMD --confluence-token \"$CONFLUENCE_API_TOKEN\""
-    DOCKER_CMD="$DOCKER_CMD --confluence-space \"$CONFLUENCE_SPACE_KEY\""
-    DOCKER_CMD="$DOCKER_CMD --confluence-parent-id \"$CONFLUENCE_PARENT_PAGE_ID\""
+if [ "$VALIDATE_ONLY" = "true" ]; then
+    DOCKER_CMD="$DOCKER_CMD --validate"
 fi
 
 # Run the Docker container with explicit parameters
@@ -68,10 +60,11 @@ if [ $? -eq 0 ]; then
     echo "Documentation generated successfully!"
     echo "Output available at: $OUTPUT_DIR"
     
-    # If publishing was enabled, show confirmation
-    if [ "$PUBLISH" = "true" ]; then
-        echo "Published to Confluence: $CONFLUENCE_URL/wiki/spaces/$CONFLUENCE_SPACE_KEY/pages/$CONFLUENCE_PARENT_PAGE_ID"
-        echo "Check your Confluence page to see the updated documentation."
+    # Open the documentation in browser if possible
+    if command -v xdg-open &> /dev/null; then
+        xdg-open "$OUTPUT_DIR/index.html" &> /dev/null || true
+    elif command -v open &> /dev/null; then
+        open "$OUTPUT_DIR/index.html" &> /dev/null || true
     fi
 else
     echo "Error: Documentation generation failed."

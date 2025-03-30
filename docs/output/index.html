@@ -5,57 +5,164 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Harness Templates Documentation</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-    <header>
-        <h1>Harness Templates Documentation</h1>
-        <div class="search-container">
-            <input type="text" id="searchInput" placeholder="Search templates...">
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h3><i class="fas fa-layer-group"></i> Harness Templates</h3>
         </div>
-        <div class="filter-container">
-            <button class="filter-btn active" data-filter="all">All</button>
-            <button class="filter-btn" data-filter="pipeline">Pipelines</button>
-            <button class="filter-btn" data-filter="stage">Stages</button>
-            <button class="filter-btn" data-filter="stepgroup">Step Groups</button>
+        <div class="sidebar-menu">
+            <a href="index.html" class="active"><i class="fas fa-home"></i> All Templates</a>
+            <a href="pipeline/"><i class="fas fa-sitemap"></i> Pipelines</a>
+            <a href="stage/"><i class="fas fa-cube"></i> Stages</a>
+            <a href="stepgroup/"><i class="fas fa-cubes"></i> Step Groups</a>
         </div>
-    </header>
+    </div>
     
-    <main>
-        <div class="templates-grid">
-    
-            <div class="template-card" data-type="stage">
-                <h2>Quickstart</h2>
-                <p class="template-type">stage</p>
-                <p class="template-description">Harness stage template</p>
-                <div class="template-tags">
-        
+    <div class="content">
+        <header>
+            <h1>Harness Templates Documentation</h1>
+            <div class="header-actions">
+                <div class="search-container">
+                    <input type="text" id="searchInput" placeholder="Search templates...">
                 </div>
-                <a href="stage/Quickstart.html" class="view-btn">View Details</a>
-            </div>
-        
-            <div class="template-card" data-type="pipeline">
-                <h2>SimplePipeline</h2>
-                <p class="template-type">pipeline</p>
-                <p class="template-description">Harness pipeline template</p>
-                <div class="template-tags">
-        
+                <div class="filter-container">
+                    <button class="filter-btn active" data-filter="all">All</button>
+                    <button class="filter-btn" data-filter="pipeline">Pipelines</button>
+                    <button class="filter-btn" data-filter="stage">Stages</button>
+                    <button class="filter-btn" data-filter="stepgroup">Step Groups</button>
                 </div>
-                <a href="pipeline/SimplePipeline.html" class="view-btn">View Details</a>
             </div>
+        </header>
         
-        </div>
-    </main>
+        <main>
+            <p class="template-count"><i class="fas fa-list"></i> <span id="visible-count">0</span> templates found</p>
+            <div class="templates-grid">
     
-    <footer>
-        <p>Generated on <span id="generation-date"></span></p>
-    </footer>
+                <div class="template-card" data-type="pipeline">
+                    <div class="card-header">
+                        <h2><i class="fas fa-sitemap"></i> CI/CD Pipeline with Variables</h2>
+                        <span class="template-badge type-pipeline">pipeline</span>
+                    </div>
+                    <p class="template-description">A complete CI/CD pipeline template with build, test, and deploy stages</p>
+                    <div class="template-tags">
+        <span class="tag"><i class="fas fa-tag"></i> cicd</span><span class="tag"><i class="fas fa-tag"></i> build</span><span class="tag"><i class="fas fa-tag"></i> deploy</span>
+                    </div>
+                    <a href="pipeline/CI_CD_Pipeline_with_Variables.html" class="view-btn">View Details</a>
+                </div>
+        
+                <div class="template-card" data-type="pipeline">
+                    <div class="card-header">
+                        <h2><i class="fas fa-sitemap"></i> Simple CD Pipeline</h2>
+                        <span class="template-badge type-pipeline">pipeline</span>
+                    </div>
+                    <p class="template-description">Harness pipeline template</p>
+                    <div class="template-tags">
+        <span class="tag"><i class="fas fa-tag"></i> cd</span><span class="tag"><i class="fas fa-tag"></i> kubernetes</span>
+                    </div>
+                    <a href="pipeline/Simple_CD_Pipeline.html" class="view-btn">View Details</a>
+                </div>
+        
+                <div class="template-card" data-type="pipeline">
+                    <div class="card-header">
+                        <h2><i class="fas fa-sitemap"></i> Simple Pipeline</h2>
+                        <span class="template-badge type-pipeline">pipeline</span>
+                    </div>
+                    <p class="template-description">Harness pipeline template</p>
+                    <div class="template-tags">
+        <span class="tag"><i class="fas fa-tag"></i> cd</span><span class="tag"><i class="fas fa-tag"></i> kubernetes</span>
+                    </div>
+                    <a href="pipeline/Simple_Pipeline.html" class="view-btn">View Details</a>
+                </div>
+        
+                <div class="template-card" data-type="stage">
+                    <div class="card-header">
+                        <h2><i class="fas fa-cube"></i> Kubernetes Deploy Stage</h2>
+                        <span class="template-badge type-stage">stage</span>
+                    </div>
+                    <p class="template-description">Harness stage template</p>
+                    <div class="template-tags">
+        <span class="tag"><i class="fas fa-tag"></i> kubernetes</span><span class="tag"><i class="fas fa-tag"></i> deployment</span><span class="tag"><i class="fas fa-tag"></i> k8s</span>
+                    </div>
+                    <a href="stage/Kubernetes_Deploy_Stage.html" class="view-btn">View Details</a>
+                </div>
+        
+                <div class="template-card" data-type="stage">
+                    <div class="card-header">
+                        <h2><i class="fas fa-cube"></i> Kubernetes Deploy Stage</h2>
+                        <span class="template-badge type-stage">stage</span>
+                    </div>
+                    <p class="template-description">Harness stage template</p>
+                    <div class="template-tags">
+        <span class="tag"><i class="fas fa-tag"></i> kubernetes</span><span class="tag"><i class="fas fa-tag"></i> deployment</span>
+                    </div>
+                    <a href="stage/Kubernetes_Deploy_Stage.html" class="view-btn">View Details</a>
+                </div>
+        
+                <div class="template-card" data-type="stage">
+                    <div class="card-header">
+                        <h2><i class="fas fa-cube"></i> Quickstart</h2>
+                        <span class="template-badge type-stage">stage</span>
+                    </div>
+                    <p class="template-description">Harness stage template</p>
+                    <div class="template-tags">
+        
+                    </div>
+                    <a href="stage/Quickstart.html" class="view-btn">View Details</a>
+                </div>
+        
+                <div class="template-card" data-type="stepgroup">
+                    <div class="card-header">
+                        <h2><i class="fas fa-cubes"></i> Security Scan Steps</h2>
+                        <span class="template-badge type-stepgroup">stepgroup</span>
+                    </div>
+                    <p class="template-description">A set of steps for running security scans on code and containers</p>
+                    <div class="template-tags">
+        <span class="tag"><i class="fas fa-tag"></i> security</span><span class="tag"><i class="fas fa-tag"></i> scan</span><span class="tag"><i class="fas fa-tag"></i> compliance</span>
+                    </div>
+                    <a href="stepgroup/Security_Scan_Steps.html" class="view-btn">View Details</a>
+                </div>
+        
+                <div class="template-card" data-type="stepgroup">
+                    <div class="card-header">
+                        <h2><i class="fas fa-cubes"></i> Shell Script Step</h2>
+                        <span class="template-badge type-stepgroup">stepgroup</span>
+                    </div>
+                    <p class="template-description">Shell Script Template for testing</p>
+                    <div class="template-tags">
+        <span class="tag"><i class="fas fa-tag"></i> testing</span><span class="tag"><i class="fas fa-tag"></i> shell</span>
+                    </div>
+                    <a href="stepgroup/Shell_Script_Step.html" class="view-btn">View Details</a>
+                </div>
+        
+            </div>
+        </main>
+        
+        <footer>
+            <p>Generated on <span id="generation-date"></span> | <a href="https://harness.io" target="_blank">Harness</a> Template Documentation</p>
+        </footer>
+    </div>
     
     <script>
-        document.getElementById('generation-date').textContent = new Date().toLocaleDateString();
+        document.getElementById('generation-date').textContent = new Date().toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        });
+        
+        // Update template count
+        function updateTemplateCount() {
+            const visibleTemplates = document.querySelectorAll('.template-card:not([style*="display: none"])');
+            document.getElementById('visible-count').textContent = visibleTemplates.length;
+        }
         
         // Search functionality
         const searchInput = document.getElementById('searchInput');
         const templateCards = document.querySelectorAll('.template-card');
+        
+        updateTemplateCount();
         
         searchInput.addEventListener('input', function() {
             const query = this.value.toLowerCase();
@@ -71,6 +178,8 @@
                     card.style.display = 'none';
                 }
             });
+            
+            updateTemplateCount();
         });
         
         // Filter functionality
@@ -90,6 +199,8 @@
                         card.style.display = 'none';
                     }
                 });
+                
+                updateTemplateCount();
             });
         });
     </script>

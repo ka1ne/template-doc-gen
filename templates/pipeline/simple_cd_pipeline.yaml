@@ -1,10 +1,8 @@
 template:
-  name: Simple Pipeline
-  identifier: Simple_Pipeline
+  name: Simple CD Pipeline
+  identifier: Simple_CD_Pipeline
   versionLabel: 1.0.0
   type: Pipeline
-  projectIdentifier: default
-  orgIdentifier: default
   tags:
     - cd
     - kubernetes
@@ -47,4 +45,4 @@ template:
                 errors:
                   - AllErrors
                 action:
-                  type: StageRollback 
+                  type: StageRollback

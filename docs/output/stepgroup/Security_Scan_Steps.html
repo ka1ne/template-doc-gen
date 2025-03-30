@@ -5,129 +5,89 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Security Scan Steps - Harness Template Documentation</title>
     <link rel="stylesheet" href="../styles.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-dark.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-    <header>
-        <h1>Security Scan Steps</h1>
-        <p><a href="../index.html">← Back to All Templates</a></p>
-    </header>
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h3><i class="fas fa-layer-group"></i> Harness Templates</h3>
+        </div>
+        <div class="sidebar-menu">
+            <a href="../index.html"><i class="fas fa-home"></i> All Templates</a>
+            <a href="../pipeline/"><i class="fas fa-sitemap"></i> Pipelines</a>
+            <a href="../stage/"><i class="fas fa-cube"></i> Stages</a>
+            <a href="../stepgroup/"><i class="fas fa-cubes"></i> Step Groups</a>
+        </div>
+    </div>
+    
+    <div class="content">
+        <header>
+            <div class="template-header">
+                <h1>Security Scan Steps</h1>
+                <span class="template-badge type-stepgroup">stepgroup</span>
+            </div>
+            <p class="breadcrumbs">
+                <a href="../index.html">Templates</a> <span>/</span> 
+                <a href="../stepgroup/">Stepgroup</a> <span>/</span> 
+                <span>Security Scan Steps</span>
+            </p>
+        </header>
 
-    <main>
-        <section class="template-section" data-type="stepgroup">
-            <div class="template-metadata">
-                <p class="template-type">Type: <span>stepgroup</span></p>
-                <p class="template-version">Version: <span>2.0.1</span></p>
-                <p class="template-author">Author: <span>Security Team</span></p>
-            </div>
-            
-            <div class="template-description">
-                <h3>Description</h3>
-                <p>A set of steps for running security scans on code and containers</p>
-            </div>
-            
-            <div class="template-tags">
-                <h3>Tags</h3>
-                <ul>
-    <li class="tag">security</li><li class="tag">scan</li><li class="tag">compliance</li>
-                </ul>
-            </div>
-            
-            <div class="template-parameters">
-                <h3>Parameters</h3>
-    
-                <table class="parameters-table">
-                    <tr>
-                        <th>Name</th>
-                        <th>Description</th>
-                        <th>Type</th>
-                        <th>Required</th>
-                        <th>Default</th>
-                        <th>Scope</th>
-                    </tr>
-        
-                    <tr>
-                        <td>scanType</td>
-                        <td>Type of scan to perform (code, container, both)</td>
-                        <td>string</td>
-                        <td>Yes</td>
-                        <td>both</td>
-                        <td>stepgroup</td>
-                    </tr>
-            
-                    <tr>
-                        <td>failOnHigh</td>
-                        <td>Whether to fail the pipeline on high severity findings</td>
-                        <td>boolean</td>
-                        <td>No</td>
-                        <td>True</td>
-                        <td>stepgroup</td>
-                    </tr>
-            </table>
-            </div>
-            
-            <div class="template-variables">
-                <h3>Variables</h3>
-    
-                <table class="variables-table">
-                    <tr>
-                        <th>Name</th>
-                        <th>Description</th>
-                        <th>Type</th>
-                        <th>Required</th>
-                        <th>Scope</th>
-                    </tr>
-        
-                    <tr>
-                        <td>scanLevel</td>
-                        <td>Level of scan to perform (basic, standard, deep)</td>
-                        <td>string</td>
-                        <td>No</td>
-                        <td>stepgroup</td>
-                    </tr>
-            
-                    <tr>
-                        <td>reportPath</td>
-                        <td>Path to save scan reports</td>
-                        <td>string</td>
-                        <td>Yes</td>
-                        <td>stepgroup</td>
-                    </tr>
-            </table>
-            <div class="template-examples">
-                <h3>Usage Examples</h3>
-                <div class="examples-container">
-        
-                    <div class="example">
-                        <h4>Example 1</h4>
-                        <pre><code># Example usage in a stage
-steps:
-  - stepGroup:
-      template:
-        name: Security Scan Steps
-        identifier: security_scan_steps
-        versionLabel: 2.0.1
-      variables:
-        scanLevel: standard
-        reportPath: reports/security/
-      parameters:
-        scanType: container
-        failOnHigh: true
-</code></pre>
+        <main>
+            <section class="template-section" data-type="stepgroup">
+                <div class="template-metadata">
+                    <div class="metadata-item">
+                        <span class="metadata-label">Version</span>
+                        <span class="metadata-value">2.0.1</span>
                     </div>
-            
+                    <div class="metadata-item">
+                        <span class="metadata-label">Author</span>
+                        <span class="metadata-value">Harness</span>
+                    </div>
                 </div>
-            </div>
+                
+                <div class="template-description">
+                    <h2>Description</h2>
+                    <p>A set of steps for running security scans on code and containers</p>
+                </div>
+                
+                <div class="template-tags">
+                    <h2>Tags</h2>
+<span class="tag"><i class="fas fa-tag"></i> security</span><span class="tag"><i class="fas fa-tag"></i> scan</span><span class="tag"><i class="fas fa-tag"></i> compliance</span>
+                </div>
+                
+                <div class="template-parameters">
+                    <h2>Parameters</h2>
+    <p class="empty-state"><i class="fas fa-info-circle"></i> No parameters defined for this template.</p>
+                </div>
+                
+                <div class="template-variables">
+                    <h2>Variables</h2>
+    <p class="empty-state"><i class="fas fa-info-circle"></i> No variables defined for this template.</p>
+            </section>
+        </main>
         
-            </div>
-        </section>
-    </main>
+        <footer>
+            <p>Generated on <span id="generation-date"></span> | <a href="https://harness.io" target="_blank">Harness</a> Template Documentation</p>
+        </footer>
+    </div>
     
-    <footer>
-        <p>Generated on <span id="generation-date"></span></p>
-    </footer>
-    
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/highlight.min.js"></script>
     <script>
-        document.getElementById('generation-date').textContent = new Date().toLocaleDateString();
+        document.getElementById('generation-date').textContent = new Date().toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        });
+        
+        // Initialize syntax highlighting
+        document.addEventListener('DOMContentLoaded', (event) => {
+            document.querySelectorAll('pre code').forEach((el) => {
+                hljs.highlightElement(el);
+            });
+        });
     </script>
 </body>
 </html>

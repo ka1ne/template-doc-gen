@@ -6,11 +6,11 @@ import argparse
 import logging
 from datetime import datetime
 from src.utils.template_html import generate_template_html, generate_index_html
-from src.utils.confluence_publisher import publish_templates_to_confluence
 import time
 import requests
 import jsonschema
 import json
+import re
 
 # Configure logging
 logging.basicConfig(
@@ -61,38 +61,6 @@ def setup_argparse():
         '--verbose',
         action='store_true',
         help='Enable verbose logging'
-    )
-    
-    # Add Confluence publishing options
-    parser.add_argument(
-        '--publish', '-p',
-        action='store_true',
-        help='Publish documentation to Confluence'
-    )
-    
-    parser.add_argument(
-        '--confluence-url',
-        help='Confluence URL (required if --publish is specified)'
-    )
-    
-    parser.add_argument(
-        '--confluence-username',
-        help='Confluence username (required if --publish is specified)'
-    )
-    
-    parser.add_argument(
-        '--confluence-token',
-        help='Confluence API token (required if --publish is specified)'
-    )
-    
-    parser.add_argument(
-        '--confluence-space',
-        help='Confluence space key (required if --publish is specified)'
-    )
-    
-    parser.add_argument(
-        '--confluence-parent-id',
-        help='Confluence parent page ID (required if --publish is specified)'
     )
     
     return parser
@@ -214,7 +182,9 @@ def process_harness_template(template_path, output_dir='docs/templates', output_
             type_dir = os.path.join(output_dir, metadata['type'])
             os.makedirs(type_dir, exist_ok=True)
             
-            output_filename = metadata['name'].replace(' ', '_') + '.html'
+            # Sanitize filename - replace any character not alphanumeric, underscore, or hyphen with underscore
+            safe_name = re.sub(r'[^a-zA-Z0-9_\-]', '_', metadata['name'])
+            output_filename = safe_name + '.html'
             output_path = os.path.join(type_dir, output_filename)
             
             # Write HTML to file
@@ -304,302 +274,702 @@ def generate_css(output_dir):
     
     logger.info(f"Generating CSS file at {css_path}")
     
-    # CSS content is the same as before
+    # CSS content with modern, clean styling
     css = """
-    /* General Styles */
+    /* Base Styles */
+    :root {
+        --sidebar-width: 260px;
+        --primary-color: #5c6bc0;
+        --primary-light: #8e99f3;
+        --primary-dark: #26418f;
+        --accent-color: #26c6da;
+        --text-color: #263238;
+        --light-gray: #f5f7fa;
+        --mid-gray: #e1e4e8;
+        --dark-gray: #546e7a;
+        --border-color: #dde1e5;
+        --code-bg: #f6f8fa;
+        --pipeline-color: #42a5f5;
+        --stage-color: #66bb6a;
+        --stepgroup-color: #ffa726;
+        --gradient: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+    }
+
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+    }
+
     body {
-        font-family: Arial, sans-serif;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', sans-serif;
         line-height: 1.6;
-        color: #333;
+        color: var(--text-color);
+        display: flex;
+        min-height: 100vh;
+        background-color: #ffffff;
+    }
+
+    a {
+        color: var(--primary-color);
+        text-decoration: none;
+        transition: color 0.2s ease;
+    }
+
+    a:hover {
+        color: var(--primary-dark);
+        text-decoration: none;
+    }
+
+    h1, h2, h3, h4 {
+        font-weight: 600;
+        line-height: 1.3;
+        margin-bottom: 1rem;
+        color: var(--text-color);
+    }
+
+    h1 {
+        font-size: 2.2rem;
+        margin-bottom: 1.5rem;
+        background: var(--gradient);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+    }
+
+    h2 {
+        font-size: 1.5rem;
+        margin-top: 2rem;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--border-color);
+        position: relative;
+    }
+    
+    h2::after {
+        content: '';
+        position: absolute;
+        bottom: -1px;
+        left: 0;
+        width: 60px;
+        height: 3px;
+        background: var(--gradient);
+        border-radius: 2px;
+    }
+
+    h3 {
+        font-size: 1.25rem;
+        margin-top: 1.5rem;
+    }
+
+    p {
+        margin-bottom: 1rem;
+    }
+
+    code {
+        font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+        font-size: 0.9em;
+        padding: 0.2em 0.4em;
+        background-color: var(--code-bg);
+        border-radius: 3px;
+    }
+
+    pre {
+        background-color: var(--code-bg);
+        padding: 1rem;
+        border-radius: 8px;
+        overflow-x: auto;
+        margin-bottom: 1.5rem;
+        border: 1px solid var(--border-color);
+        box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    }
+
+    pre code {
+        padding: 0;
+        background-color: transparent;
+    }
+
+    /* Layout */
+    .sidebar {
+        width: var(--sidebar-width);
+        background: var(--gradient);
+        position: fixed;
+        height: 100vh;
+        overflow-y: auto;
+        box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+        z-index: 10;
+    }
+
+    .content {
+        flex: 1;
+        margin-left: var(--sidebar-width);
+        padding: 0;
+        max-width: 100%;
+    }
+
+    header {
+        background-color: #ffffff;
+        padding: 2rem 2.5rem 1.5rem;
+        border-bottom: 1px solid var(--border-color);
+        box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+    }
+
+    main {
+        padding: 2.5rem;
         max-width: 1200px;
         margin: 0 auto;
-        padding: 20px;
     }
-    
-    h1, h2, h3, h4 {
-        color: #2c3e50;
+
+    footer {
+        margin-top: 4rem;
+        padding: 1.5rem 2rem;
+        text-align: center;
+        color: var(--dark-gray);
+        border-top: 1px solid var(--border-color);
+        font-size: 0.9rem;
     }
-    
+
+    /* Sidebar Styles */
+    .sidebar-header {
+        padding: 1.8rem 1.5rem;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .sidebar-header h3 {
+        color: white;
+        margin: 0;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .sidebar-header h3 i {
+        font-size: 1.2rem;
+    }
+
+    .sidebar-menu {
+        padding: 1.2rem 0;
+    }
+
+    .sidebar-menu a {
+        display: flex;
+        align-items: center;
+        gap: 0.8rem;
+        padding: 0.85rem 1.5rem;
+        color: rgba(255,255,255,0.9);
+        transition: all 0.2s ease;
+        border-left: 3px solid transparent;
+        font-weight: 500;
+    }
+
+    .sidebar-menu a i {
+        font-size: 1.1rem;
+        width: 1.5rem;
+        text-align: center;
+    }
+
+    .sidebar-menu a:hover {
+        background-color: rgba(255,255,255,0.1);
+        color: white;
+    }
+
+    .sidebar-menu a.active {
+        background-color: rgba(255,255,255,0.15);
+        border-left-color: white;
+        color: white;
+    }
+
     /* Header Styles */
-    header {
-        background-color: #f8f9fa;
-        padding: 20px;
-        border-radius: 5px;
-        margin-bottom: 30px;
-        border-bottom: 3px solid #3498db;
+    .template-header {
+        display: flex;
+        align-items: center;
+        margin-bottom: 0.8rem;
+        gap: 1rem;
     }
-    
+
+    .template-header h1 {
+        margin: 0;
+    }
+
+    .breadcrumbs {
+        color: var(--dark-gray);
+        font-size: 0.9rem;
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .breadcrumbs a {
+        font-weight: 500;
+    }
+
+    .breadcrumbs span {
+        color: var(--dark-gray);
+    }
+
+    .header-actions {
+        margin-top: 1.5rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        align-items: center;
+    }
+
     .search-container {
-        margin: 20px 0;
+        flex: 1;
+        max-width: 500px;
+        position: relative;
     }
-    
+
+    .search-container::before {
+        content: "\\f002";
+        font-family: "Font Awesome 6 Free";
+        font-weight: 900;
+        position: absolute;
+        left: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--dark-gray);
+        font-size: 0.9rem;
+    }
+
     #searchInput {
         width: 100%;
-        padding: 10px;
-        font-size: 16px;
-        border: 1px solid #ddd;
-        border-radius: 4px;
+        padding: 0.75rem 1rem 0.75rem 2.5rem;
+        font-size: 1rem;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.02);
     }
-    
+
+    #searchInput:focus {
+        outline: none;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(92,107,192,0.2);
+    }
+
     .filter-container {
         display: flex;
         flex-wrap: wrap;
-        gap: 10px;
-        margin-bottom: 20px;
+        gap: 0.5rem;
     }
-    
+
     .filter-btn {
-        padding: 8px 15px;
-        background-color: #f1f1f1;
-        border: none;
-        border-radius: 4px;
+        padding: 0.6rem 1.2rem;
+        background-color: var(--light-gray);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
         cursor: pointer;
-        transition: background-color 0.3s;
+        font-size: 0.9rem;
+        transition: all 0.2s;
+        font-weight: 500;
     }
-    
+
     .filter-btn:hover {
-        background-color: #ddd;
+        background-color: var(--mid-gray);
     }
-    
+
     .filter-btn.active {
-        background-color: #3498db;
+        background: var(--gradient);
         color: white;
+        border-color: var(--primary-color);
+        box-shadow: 0 2px 5px rgba(92,107,192,0.3);
+    }
+
+    /* Template Type Badges */
+    .template-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.4rem 0.9rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+
+    .template-badge::before {
+        font-family: "Font Awesome 6 Free";
+        font-weight: 900;
+    }
+
+    .type-pipeline {
+        background-color: rgba(66, 165, 245, 0.15);
+        color: var(--pipeline-color);
     }
     
+    .type-pipeline::before {
+        content: "\\f085";
+    }
+
+    .type-stage {
+        background-color: rgba(102, 187, 106, 0.15);
+        color: var(--stage-color);
+    }
+    
+    .type-stage::before {
+        content: "\\f5fd";
+    }
+
+    .type-stepgroup {
+        background-color: rgba(255, 167, 38, 0.15);
+        color: var(--stepgroup-color);
+    }
+    
+    .type-stepgroup::before {
+        content: "\\f0ae";
+    }
+
+    /* Template Count */
+    .template-count {
+        margin-bottom: 1.8rem;
+        font-size: 0.95rem;
+        color: var(--dark-gray);
+        background-color: var(--light-gray);
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-weight: 500;
+    }
+
+    .template-count i {
+        color: var(--primary-color);
+    }
+
     /* Template Grid */
     .templates-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-        gap: 20px;
+        grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+        gap: 1.8rem;
     }
-    
+
     .template-card {
-        border: 1px solid #ddd;
-        border-radius: 5px;
-        padding: 15px;
-        transition: transform 0.3s, box-shadow 0.3s;
+        background-color: white;
+        border-radius: 12px;
+        padding: 1.8rem;
+        transition: all 0.3s ease;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        border: 1px solid var(--border-color);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+        position: relative;
+        overflow: hidden;
     }
     
+    .template-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 5px;
+        background: var(--gradient);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
     .template-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        box-shadow: 0 12px 20px rgba(0,0,0,0.06);
+        transform: translateY(-4px);
     }
     
+    .template-card:hover::before {
+        opacity: 1;
+    }
+
+    .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 1.2rem;
+    }
+
     .template-card h2 {
-        margin-top: 0;
-        color: #3498db;
+        font-size: 1.3rem;
+        margin: 0;
+        border: none;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
     }
     
-    .template-type {
-        display: inline-block;
-        background-color: #e1f5fe;
-        color: #0288d1;
-        padding: 3px 8px;
-        border-radius: 3px;
-        font-size: 14px;
+    .template-card h2::after {
+        display: none;
     }
     
+    .template-card h2 i {
+        color: var(--primary-color);
+        font-size: 1.1rem;
+    }
+
     .template-description {
-        color: #666;
-        margin: 10px 0;
+        color: var(--dark-gray);
+        margin-bottom: 1.5rem;
+        flex-grow: 1;
+        line-height: 1.5;
     }
-    
+
     .template-tags {
         display: flex;
         flex-wrap: wrap;
-        gap: 5px;
-        margin: 10px 0;
+        gap: 0.5rem;
+        margin-bottom: 1.5rem;
     }
-    
+
     .tag {
-        background-color: #f1f1f1;
-        padding: 3px 8px;
-        border-radius: 3px;
-        font-size: 12px;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        background-color: var(--light-gray);
+        color: var(--dark-gray);
+        padding: 0.3rem 0.7rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        border: 1px solid transparent;
     }
     
-    .view-btn {
-        display: inline-block;
-        background-color: #3498db;
+    .tag i {
+        color: var(--primary-color);
+    }
+    
+    .tag:hover {
+        background-color: var(--primary-light);
         color: white;
-        padding: 8px 15px;
-        text-decoration: none;
-        border-radius: 4px;
-        margin-top: 10px;
-        transition: background-color 0.3s;
+        border-color: var(--primary-light);
     }
     
+    .tag:hover i {
+        color: white;
+    }
+
+    .view-btn {
+        display: inline-flex;
+        align-items: center;
+        background: var(--gradient);
+        color: white;
+        padding: 0.7rem 1.2rem;
+        border-radius: 8px;
+        transition: all 0.2s ease;
+        font-weight: 500;
+        box-shadow: 0 2px 5px rgba(92,107,192,0.3);
+        position: relative;
+        overflow: hidden;
+        align-self: flex-start;
+    }
+    
+    .view-btn::after {
+        content: "\\f054";
+        font-family: "Font Awesome 6 Free";
+        font-weight: 900;
+        margin-left: 0.5rem;
+        font-size: 0.8rem;
+        transition: transform 0.2s ease;
+    }
+
     .view-btn:hover {
-        background-color: #2980b9;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(92,107,192,0.4);
     }
     
+    .view-btn:hover::after {
+        transform: translateX(3px);
+    }
+
     /* Template Section Styles */
     .template-section {
-        background-color: #fff;
-        border: 1px solid #ddd;
-        border-radius: 5px;
-        padding: 20px;
-        margin-bottom: 30px;
+        background-color: white;
+        border-radius: 12px;
+        padding: 2rem;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        border: 1px solid var(--border-color);
     }
-    
+
     .template-metadata {
         display: flex;
         flex-wrap: wrap;
-        gap: 20px;
-        margin-bottom: 20px;
-        padding-bottom: 15px;
-        border-bottom: 1px solid #eee;
+        gap: 2rem;
+        margin-bottom: 2.5rem;
+    }
+
+    .metadata-item {
+        display: flex;
+        flex-direction: column;
+        background-color: var(--light-gray);
+        padding: 1rem 1.5rem;
+        border-radius: 8px;
+        min-width: 140px;
+        transition: transform 0.2s ease;
     }
     
-    .template-metadata p {
-        margin: 0;
+    .metadata-item:hover {
+        transform: translateY(-2px);
     }
-    
-    .template-metadata span {
-        font-weight: bold;
-        color: #3498db;
+
+    .metadata-label {
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        color: var(--dark-gray);
+        margin-bottom: 0.4rem;
+        letter-spacing: 0.05em;
     }
-    
-    .template-description h3,
-    .template-tags h3,
-    .template-parameters h3,
-    .template-variables h3 {
-        margin-top: 25px;
-        border-bottom: 2px solid #f1f1f1;
-        padding-bottom: 10px;
+
+    .metadata-value {
+        font-weight: 600;
+        font-size: 1.1rem;
+        color: var(--primary-color);
     }
-    
+
     /* Table Styles */
     table {
         width: 100%;
-        border-collapse: collapse;
-        margin: 20px 0;
+        border-collapse: separate;
+        border-spacing: 0;
+        margin: 1.5rem 0;
+        font-size: 0.95rem;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        border: 1px solid var(--border-color);
     }
-    
+
+    thead {
+        background-color: var(--light-gray);
+    }
+
     th, td {
-        padding: 12px 15px;
+        padding: 0.9rem 1rem;
         text-align: left;
-        border-bottom: 1px solid #ddd;
+        border-bottom: 1px solid var(--border-color);
     }
     
     th {
-        background-color: #f8f9fa;
-        font-weight: bold;
+        font-weight: 600;
+        color: var(--text-color);
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
     }
     
-    tr:hover {
-        background-color: #f5f5f5;
+    tr:last-child td {
+        border-bottom: none;
+    }
+
+    tr:hover td {
+        background-color: rgba(92,107,192,0.05);
+    }
+
+    .param-name, .var-name {
+        font-weight: 600;
+        color: var(--primary-color);
+        font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+        font-size: 0.9em;
+    }
+
+    /* Empty state */
+    .empty-state {
+        background-color: var(--light-gray);
+        padding: 1rem 1.5rem;
+        border-radius: 8px;
+        color: var(--dark-gray);
+        display: flex;
+        align-items: center;
+        gap: 0.8rem;
+        margin: 1rem 0;
+        font-size: 0.95rem;
+        border-left: 4px solid var(--primary-color);
     }
     
-    /* Footer Styles */
-    footer {
-        margin-top: 50px;
-        padding-top: 20px;
-        border-top: 1px solid #eee;
-        text-align: center;
-        color: #777;
+    .empty-state i {
+        color: var(--primary-color);
+        font-size: 1.2rem;
+    }
+
+    /* Required Badge */
+    .required {
+        background-color: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    /* Examples Styles */
+    .examples-container {
+        margin-top: 2rem;
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+    }
+
+    .example {
+        background-color: var(--light-gray);
+        border-radius: 8px;
+        padding: 1.5rem;
+        border-left: 4px solid var(--primary-color);
     }
     
+    .example h3 {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--primary-color);
+        margin-top: 0;
+        margin-bottom: 1rem;
+        font-size: 1.1rem;
+    }
+
     /* Responsive Adjustments */
-    @media (max-width: 768px) {
-        .templates-grid {
-            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    @media (max-width: 992px) {
+        .sidebar {
+            width: 220px;
         }
-        
+        .content {
+            margin-left: 220px;
+        }
+    }
+
+    @media (max-width: 768px) {
+        body {
+            flex-direction: column;
+        }
+        .sidebar {
+            width: 100%;
+            position: static;
+            height: auto;
+            max-height: 300px;
+        }
+        .content {
+            margin-left: 0;
+        }
+        .templates-grid {
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        }
         .template-metadata {
             flex-direction: column;
-            gap: 10px;
+            gap: 1rem;
         }
-        
-        table {
-            display: block;
-            overflow-x: auto;
+        header, main {
+            padding: 1.5rem;
+        }
+        h1 {
+            font-size: 1.8rem;
         }
     }
     """
     
     with open(css_path, 'w') as file:
         file.write(css)
-
-def publish_to_confluence(documentation_files, args):
-    """Publish generated documentation to Confluence."""
-    logger.info("Publishing documentation to Confluence...")
-    
-    try:
-        import requests
-        import json
-        
-        # Initialize direct REST API approach instead of using the atlassian-python-api library
-        # which has compatibility issues with the 'get_current_user' method
-        confluence_url = args.confluence_url.rstrip('/')
-        confluence_api_url = f"{confluence_url}/wiki/rest/api"
-        auth = (args.confluence_username, args.confluence_token)
-        
-        # Test connection with a simple request
-        test_response = requests.get(
-            f"{confluence_api_url}/user?accountId=current",
-            auth=auth
-        )
-        
-        if test_response.status_code != 200:
-            logger.error(f"Failed to connect to Confluence: {test_response.status_code} - {test_response.text}")
-            return False
-        else:
-            user_data = test_response.json()
-            logger.debug(f"Connected to Confluence as {user_data.get('displayName', 'Unknown user')}")
-        
-        # Publish index page first
-        index_file = os.path.join(args.output, 'index.html')
-        if os.path.exists(index_file):
-            logger.info(f"Publishing index page to Confluence: {index_file}")
-            
-            with open(index_file, 'r', encoding='utf-8') as f:
-                content = f.read()
-            
-            # Create page title with timestamp to avoid conflicts
-            page_title = f"Harness Template Documentation - {time.strftime('%Y-%m-%d %H:%M:%S')}"
-            
-            # Prepare the JSON payload
-            payload = {
-                "type": "page",
-                "title": page_title,
-                "space": {"key": args.confluence_space},
-                "body": {
-                    "storage": {
-                        "value": content,
-                        "representation": "storage"
-                    }
-                },
-                "ancestors": [{"id": args.confluence_parent_id}]
-            }
-            
-            # Make the API call to create the page
-            response = requests.post(
-                f"{confluence_api_url}/content",
-                json=payload,
-                auth=auth,
-                headers={"Content-Type": "application/json"}
-            )
-            
-            if response.status_code == 200:
-                page_data = response.json()
-                logger.info(f"Published documentation index to Confluence: {page_data.get('_links', {}).get('webui', '')}")
-                return True
-            else:
-                logger.error(f"Failed to publish to Confluence. Status code: {response.status_code}")
-                logger.error(f"Response: {response.text}")
-                return False
-                
-        else:
-            logger.error(f"Index file not found: {index_file}")
-            return False
-            
-    except ImportError as e:
-        logger.error(f"Failed to import required library: {e}")
-        return False
-    except Exception as e:
-        logger.error(f"Failed to publish to Confluence: {e}")
-        return False
 
 def extract_template_metadata(template_data):
     """Extract metadata from Harness template including variables and descriptions."""
@@ -723,33 +1093,8 @@ def main():
         validate_only=args.validate
     )
     
-    # If publish flag is set, publish to Confluence
-    if args.publish:
-        # Check for required Confluence arguments
-        missing_args = []
-        if not args.confluence_url:
-            missing_args.append("--confluence-url")
-        if not args.confluence_username:
-            missing_args.append("--confluence-username")
-        if not args.confluence_token:
-            missing_args.append("--confluence-token")
-        if not args.confluence_space:
-            missing_args.append("--confluence-space")
-        if not args.confluence_parent_id:
-            missing_args.append("--confluence-parent-id")
-            
-        if missing_args:
-            logger.error(f"Missing required arguments for Confluence publishing: {', '.join(missing_args)}")
-            sys.exit(1)
-            
-        # Publish to Confluence
-        logger.info("Publishing documentation to Confluence")
-        try:
-            publish_to_confluence(all_metadata, args)
-            logger.info("Successfully published documentation to Confluence")
-        except Exception as e:
-            logger.error(f"Failed to publish documentation to Confluence: {e}", exc_info=True)
-            sys.exit(1)
+    logger.info(f"Successfully generated documentation for {len(all_metadata)} templates")
+    logger.info(f"Output directory: {args.output}")
     
     return 0
 

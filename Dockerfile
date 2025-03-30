@@ -1,7 +1,7 @@
 FROM python:3.10-slim
 
 LABEL maintainer="Kaine@enterpriseautomation.co.uk"
-LABEL version="0.0.2-alpha"
+LABEL version="0.0.3-alpha"
 
 
 # Set environment variables
@@ -16,7 +16,6 @@ WORKDIR /app
 # Install dependencies first (for better layer caching)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install requests
 
 # Copy application files
 COPY . .
@@ -26,7 +25,6 @@ ENV SOURCE_DIR=/app/templates \
     OUTPUT_DIR=/app/docs/output \
     FORMAT=html \
     VERBOSE=false \
-    PUBLISH=false \
     VALIDATE_ONLY=false
 
 # Create output directory
