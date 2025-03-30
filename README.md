@@ -1,6 +1,6 @@
 # Harness Template Docs Generator
 
-> Generate beautiful documentation from Harness templates automatically.
+> Generate documentation from Harness templates automatically.
 
 [![Version](https://img.shields.io/badge/version-0.0.3--alpha-blue)](https://hub.docker.com/repository/docker/ka1ne/template-doc-gen/tags/0.0.3-alpha/sha256:af1c5885d18f1b3e7d758da1427cb890005af62d05cb28a9f218766d39b0ff9e)
 
