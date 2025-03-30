@@ -9,14 +9,6 @@
 
 Transforms Harness templates into searchable HTML documentation, extracting metadata, parameters, variables, and examples while validating against official schemas.
 
-## Features
-
-- Modern, responsive design with dark mode support
-- Full-text search and type filtering
-- Syntax highlighting for code examples
-- Official schema validation
-- Docker-ready for CI/CD integration
-
 ## Quick Start
 
 ### Option 1: Docker (Recommended)
@@ -63,15 +55,6 @@ VERBOSE=true             # Show detailed logs
 
 ## Documentation Integration
 
-### Static Web Hosting
-
-```bash
-# AWS S3
-aws s3 sync docs/output/ s3://your-bucket/templates-docs/ --acl public-read
-
-# GitHub Pages
-cp -r docs/output/* docs/
-git add docs && git commit -m "Update docs" && git push
 ```
 
 ## Command Reference
@@ -86,12 +69,6 @@ python process_template.py --help
 --verbose       Show detailed logs
 --validate      Validate templates without generating
 ```
-
-## Best Practices
-
-- Include name, description, type, author, version and tags in templates
-- Set up webhooks to update docs automatically on template changes
-- Make templates self-documenting with examples
 
 ## Learn More
 
