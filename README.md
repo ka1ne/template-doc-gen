@@ -74,10 +74,6 @@ cp -r docs/output/* docs/
 git add docs && git commit -m "Update docs" && git push
 ```
 
-### CI/CD Integration
-
-Use the included GitHub Actions workflow example to automatically generate docs on template changes.
-
 ## Command Reference
 
 ```bash
