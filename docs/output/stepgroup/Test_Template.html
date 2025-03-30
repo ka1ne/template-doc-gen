@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Template - Harness Template Documentation</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <header>
+        <h1>Test Template</h1>
+        <p><a href="../index.html">← Back to All Templates</a></p>
+    </header>
+
+    <main>
+        <section class="template-section" data-type="stepgroup">
+            <div class="template-metadata">
+                <p class="template-type">Type: <span>stepgroup</span></p>
+                <p class="template-version">Version: <span>1.0.0</span></p>
+                <p class="template-author">Author: <span>Test User</span></p>
+            </div>
+            
+            <div class="template-description">
+                <h3>Description</h3>
+                <p>A test template for documentation generation</p>
+            </div>
+            
+            <div class="template-tags">
+                <h3>Tags</h3>
+                <ul>
+    <li class="tag">test</li><li class="tag">documentation</li>
+                </ul>
+            </div>
+            
+            <div class="template-parameters">
+                <h3>Parameters</h3>
+    <p>No parameters defined for this template.</p>
+            </div>
+            
+            <div class="template-variables">
+                <h3>Variables</h3>
+    <p>No variables defined for this template.</p>
+            <div class="template-examples">
+                <h3>Usage Examples</h3>
+                <div class="examples-container">
+        
+                    <div class="example">
+                        <h4>Example 1</h4>
+                        <pre><code># Example usage
+steps:
+  - template:
+      name: Test Template
+      identifier: test_template
+      versionLabel: 1.0.0 </code></pre>
+                    </div>
+            
+                </div>
+            </div>
+        
+            </div>
+        </section>
+    </main>
+    
+    <footer>
+        <p>Generated on <span id="generation-date"></span></p>
+    </footer>
+    
+    <script>
+        document.getElementById('generation-date').textContent = new Date().toLocaleDateString();
+    </script>
+</body>
+</html>
+    

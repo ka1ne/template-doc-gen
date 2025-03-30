@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Harness Templates Documentation</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>Harness Templates Documentation</h1>
+        <div class="search-container">
+            <input type="text" id="searchInput" placeholder="Search templates...">
+        </div>
+        <div class="filter-container">
+            <button class="filter-btn active" data-filter="all">All</button>
+            <button class="filter-btn" data-filter="pipeline">Pipelines</button>
+            <button class="filter-btn" data-filter="stage">Stages</button>
+            <button class="filter-btn" data-filter="stepgroup">Step Groups</button>
+        </div>
+    </header>
+    
+    <main>
+        <div class="templates-grid">
+    
+            <div class="template-card" data-type="stage">
+                <h2>Quickstart</h2>
+                <p class="template-type">stage</p>
+                <p class="template-description">Harness stage template</p>
+                <div class="template-tags">
+        
+                </div>
+                <a href="stage/Quickstart.html" class="view-btn">View Details</a>
+            </div>
+        
+            <div class="template-card" data-type="pipeline">
+                <h2>SimplePipeline</h2>
+                <p class="template-type">pipeline</p>
+                <p class="template-description">Harness pipeline template</p>
+                <div class="template-tags">
+        
+                </div>
+                <a href="pipeline/SimplePipeline.html" class="view-btn">View Details</a>
+            </div>
+        
+        </div>
+    </main>
+    
+    <footer>
+        <p>Generated on <span id="generation-date"></span></p>
+    </footer>
+    
+    <script>
+        document.getElementById('generation-date').textContent = new Date().toLocaleDateString();
+        
+        // Search functionality
+        const searchInput = document.getElementById('searchInput');
+        const templateCards = document.querySelectorAll('.template-card');
+        
+        searchInput.addEventListener('input', function() {
+            const query = this.value.toLowerCase();
+            
+            templateCards.forEach(card => {
+                const name = card.querySelector('h2').textContent.toLowerCase();
+                const description = card.querySelector('.template-description').textContent.toLowerCase();
+                const tags = Array.from(card.querySelectorAll('.tag')).map(tag => tag.textContent.toLowerCase());
+                
+                if (name.includes(query) || description.includes(query) || tags.some(tag => tag.includes(query))) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        });
+        
+        // Filter functionality
+        const filterButtons = document.querySelectorAll('.filter-btn');
+        
+        filterButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const filter = this.getAttribute('data-filter');
+                
+                filterButtons.forEach(btn => btn.classList.remove('active'));
+                this.classList.add('active');
+                
+                templateCards.forEach(card => {
+                    if (filter === 'all' || card.getAttribute('data-type') === filter) {
+                        card.style.display = 'block';
+                    } else {
+                        card.style.display = 'none';
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
+    

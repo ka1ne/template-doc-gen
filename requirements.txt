@@ -1,3 +1,5 @@
 pyyaml>=6.0
 argparse>=1.4.0
-atlassian-python-api>=3.32.0 
+atlassian-python-api>=3.32.0
+requests>=2.25.1
+jsonschema>=4.0.0 

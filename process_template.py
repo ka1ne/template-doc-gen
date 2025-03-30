@@ -6,8 +6,11 @@ import argparse
 import logging
 from datetime import datetime
 from src.utils.template_html import generate_template_html, generate_index_html
-from main import extract_template_metadata
 from src.utils.confluence_publisher import publish_templates_to_confluence
+import time
+import requests
+import jsonschema
+import json
 
 # Configure logging
 logging.basicConfig(
@@ -18,6 +21,9 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger('harness-docs')
+
+# Cache for schema files
+schema_cache = {}
 
 def setup_argparse():
     """Set up command-line argument parsing."""
@@ -91,19 +97,91 @@ def setup_argparse():
     
     return parser
 
+def get_harness_schema(schema_type="pipeline"):
+    """Fetch the Harness schema from GitHub or use cached version."""
+    if schema_type not in schema_cache:
+        try:
+            # Map to the correct schema file
+            # The Harness repo has pipeline.json, template.json, and trigger.json
+            schema_file = "pipeline.json"  # Default
+            
+            if schema_type == "stage" or schema_type == "step":
+                # Stages and steps are defined in the template.json schema
+                schema_file = "template.json"
+            elif schema_type == "trigger":
+                schema_file = "trigger.json"
+                
+            # Default to v0 schema
+            schema_url = f"https://raw.githubusercontent.com/harness/harness-schema/main/v0/{schema_file}"
+            logger.debug(f"Fetching schema from {schema_url}")
+            
+            response = requests.get(schema_url)
+            if response.status_code == 200:
+                schema_cache[schema_type] = response.json()
+                logger.debug(f"Successfully fetched {schema_type} schema using {schema_file}")
+            else:
+                logger.error(f"Failed to fetch schema: {response.status_code} from URL {schema_url}")
+                # Use empty schema as fallback
+                schema_cache[schema_type] = {}
+        except Exception as e:
+            logger.error(f"Error fetching schema: {e}")
+            # Use empty schema as fallback
+            schema_cache[schema_type] = {}
+    
+    return schema_cache[schema_type]
+
 def validate_template(template_data):
-    """Validate a template's structure and required fields."""
-    required_fields = ['name', 'description', 'type']
-    
-    for field in required_fields:
-        if field not in template_data:
-            return False, f"Missing required field: {field}"
-    
-    valid_types = ['pipeline', 'stage', 'stepgroup']
-    if template_data.get('type') not in valid_types:
-        return False, f"Invalid template type: {template_data.get('type')}. Must be one of {valid_types}"
-    
-    return True, "Template is valid"
+    """Validate a template using the official Harness schema."""
+    try:
+        # For Harness template format
+        if 'template' in template_data and isinstance(template_data['template'], dict):
+            template_obj = template_data['template']
+            
+            # Determine schema type based on template type
+            schema_type = "pipeline"  # Default
+            if 'type' in template_obj:
+                if template_obj['type'] == "Stage":
+                    schema_type = "stage"
+                elif template_obj['type'] == "Pipeline":
+                    schema_type = "pipeline"
+                elif template_obj['type'] == "StepGroup":
+                    schema_type = "step"
+            
+            # Get the appropriate schema
+            try:
+                schema = get_harness_schema(schema_type)
+                
+                # Validate against schema
+                jsonschema.validate(template_data, schema)
+                return True, f"Template is valid according to Harness {schema_type} schema"
+            except jsonschema.exceptions.ValidationError as e:
+                logger.debug(f"Schema validation failed, falling back to basic validation: {str(e)}")
+                # Fall back to basic validation
+                if 'name' not in template_obj:
+                    return False, "Missing required field: name in template object"
+                return True, "Basic validation passed (schema validation failed)"
+            except Exception as e:
+                logger.debug(f"Error during schema validation: {str(e)}")
+                # If schema validation fails for any reason, fall back to basic validation
+                if 'name' not in template_obj:
+                    return False, "Missing required field: name in template object"
+                return True, "Basic validation passed (schema validation error)"
+        
+        # Original validation for our custom template format
+        required_fields = ['name', 'description', 'type']
+        
+        for field in required_fields:
+            if field not in template_data:
+                return False, f"Missing required field: {field}"
+        
+        valid_types = ['pipeline', 'stage', 'stepgroup']
+        if template_data.get('type') not in valid_types:
+            return False, f"Invalid template type: {template_data.get('type')}. Must be one of {valid_types}"
+        
+        return True, "Template is valid"
+    except Exception as e:
+        logger.error(f"Validation error: {str(e)}")
+        return False, f"Validation error: {str(e)}"
 
 def process_harness_template(template_path, output_dir='docs/templates', output_format='html', validate_only=False):
     """Process a Harness template file and generate documentation."""
@@ -443,6 +521,189 @@ def generate_css(output_dir):
     with open(css_path, 'w') as file:
         file.write(css)
 
+def publish_to_confluence(documentation_files, args):
+    """Publish generated documentation to Confluence."""
+    logger.info("Publishing documentation to Confluence...")
+    
+    try:
+        import requests
+        import json
+        
+        # Initialize direct REST API approach instead of using the atlassian-python-api library
+        # which has compatibility issues with the 'get_current_user' method
+        confluence_url = args.confluence_url.rstrip('/')
+        confluence_api_url = f"{confluence_url}/wiki/rest/api"
+        auth = (args.confluence_username, args.confluence_token)
+        
+        # Test connection with a simple request
+        test_response = requests.get(
+            f"{confluence_api_url}/user?accountId=current",
+            auth=auth
+        )
+        
+        if test_response.status_code != 200:
+            logger.error(f"Failed to connect to Confluence: {test_response.status_code} - {test_response.text}")
+            return False
+        else:
+            user_data = test_response.json()
+            logger.debug(f"Connected to Confluence as {user_data.get('displayName', 'Unknown user')}")
+        
+        # Publish index page first
+        index_file = os.path.join(args.output, 'index.html')
+        if os.path.exists(index_file):
+            logger.info(f"Publishing index page to Confluence: {index_file}")
+            
+            with open(index_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Create page title with timestamp to avoid conflicts
+            page_title = f"Harness Template Documentation - {time.strftime('%Y-%m-%d %H:%M:%S')}"
+            
+            # Prepare the JSON payload
+            payload = {
+                "type": "page",
+                "title": page_title,
+                "space": {"key": args.confluence_space},
+                "body": {
+                    "storage": {
+                        "value": content,
+                        "representation": "storage"
+                    }
+                },
+                "ancestors": [{"id": args.confluence_parent_id}]
+            }
+            
+            # Make the API call to create the page
+            response = requests.post(
+                f"{confluence_api_url}/content",
+                json=payload,
+                auth=auth,
+                headers={"Content-Type": "application/json"}
+            )
+            
+            if response.status_code == 200:
+                page_data = response.json()
+                logger.info(f"Published documentation index to Confluence: {page_data.get('_links', {}).get('webui', '')}")
+                return True
+            else:
+                logger.error(f"Failed to publish to Confluence. Status code: {response.status_code}")
+                logger.error(f"Response: {response.text}")
+                return False
+                
+        else:
+            logger.error(f"Index file not found: {index_file}")
+            return False
+            
+    except ImportError as e:
+        logger.error(f"Failed to import required library: {e}")
+        return False
+    except Exception as e:
+        logger.error(f"Failed to publish to Confluence: {e}")
+        return False
+
+def extract_template_metadata(template_data):
+    """Extract metadata from Harness template including variables and descriptions."""
+    try:
+        # For the Harness template format where template is a root key
+        if 'template' in template_data and isinstance(template_data['template'], dict):
+            template_obj = template_data['template']
+            
+            # Determine template type
+            template_type = None
+            if 'type' in template_obj:
+                if template_obj['type'] in ['Stage', 'Pipeline', 'StepGroup']:
+                    template_type = template_obj['type'].lower()
+            
+            # Extract variables from spec sections
+            variables = {}
+            parameters = {}
+            
+            # Try to extract variables and parameters from the spec if available
+            if 'spec' in template_obj:
+                spec = template_obj['spec']
+                if 'serviceConfig' in spec.get('spec', {}):
+                    service_config = spec['spec']['serviceConfig']
+                    if 'serviceDefinition' in service_config:
+                        service_def = service_config['serviceDefinition']
+                        if 'spec' in service_def and 'variables' in service_def['spec']:
+                            for var in service_def['spec'].get('variables', []):
+                                if isinstance(var, dict) and 'name' in var:
+                                    variables[var['name']] = {
+                                        'description': var.get('description', ''),
+                                        'type': var.get('type', 'string'),
+                                        'required': var.get('required', False),
+                                        'scope': 'stage'
+                                    }
+                
+                # Extract step parameters if present
+                if 'execution' in spec.get('spec', {}):
+                    execution = spec['spec']['execution']
+                    if 'steps' in execution:
+                        for step in execution['steps']:
+                            if 'step' in step and 'spec' in step['step']:
+                                step_spec = step['step']['spec']
+                                for param_name, param_value in step_spec.items():
+                                    parameters[param_name] = {
+                                        'description': f"Parameter for {step['step'].get('name', 'step')}",
+                                        'type': 'boolean' if isinstance(param_value, bool) else 'string',
+                                        'required': False,
+                                        'default': param_value,
+                                        'scope': 'step'
+                                    }
+            
+            # Extract tags
+            tags = []
+            if 'tags' in template_obj and template_obj['tags']:
+                if isinstance(template_obj['tags'], dict):
+                    # If tags are key-value pairs
+                    for tag_key, tag_value in template_obj['tags'].items():
+                        tags.append(tag_key)
+                        if tag_value and str(tag_value).strip():
+                            tags.append(str(tag_value))
+                elif isinstance(template_obj['tags'], list):
+                    # If tags are a list
+                    tags.extend(template_obj['tags'])
+            
+            metadata = {
+                'name': template_obj.get('name', 'Unnamed Template'),
+                'type': template_type or 'stage',  # Default to stage if unknown
+                'variables': variables,
+                'parameters': parameters,
+                'description': template_obj.get('description', f"Harness {template_type or 'stage'} template"),
+                'tags': tags,
+                'author': 'Harness',
+                'version': template_obj.get('versionLabel', '1.0.0'),
+                'examples': []
+            }
+            return metadata
+        
+        # For older templates with direct metadata
+        return {
+            'name': template_data.get('name', 'Unnamed Template'),
+            'type': template_data.get('type', 'unknown'),
+            'variables': template_data.get('variables', {}),
+            'parameters': template_data.get('parameters', {}),
+            'description': template_data.get('description', ''),
+            'tags': template_data.get('tags', []),
+            'author': template_data.get('author', ''),
+            'version': template_data.get('version', '1.0.0'),
+            'examples': template_data.get('examples', [])
+        }
+    except Exception as e:
+        logger.error(f"Error extracting metadata: {e}")
+        # Return basic metadata to avoid complete failure
+        return {
+            'name': template_data.get('name', 'Unnamed Template'),
+            'type': 'unknown',
+            'variables': {},
+            'parameters': {},
+            'description': 'Error extracting template metadata',
+            'tags': [],
+            'author': '',
+            'version': '1.0.0',
+            'examples': []
+        }
+
 def main():
     """Main function to handle command-line invocation."""
     parser = setup_argparse()
@@ -484,15 +745,7 @@ def main():
         # Publish to Confluence
         logger.info("Publishing documentation to Confluence")
         try:
-            publish_templates_to_confluence(
-                all_metadata,
-                args.output,
-                args.confluence_url,
-                args.confluence_username,
-                args.confluence_token,
-                args.confluence_space,
-                args.confluence_parent_id
-            )
+            publish_to_confluence(all_metadata, args)
             logger.info("Successfully published documentation to Confluence")
         except Exception as e:
             logger.error(f"Failed to publish documentation to Confluence: {e}", exc_info=True)

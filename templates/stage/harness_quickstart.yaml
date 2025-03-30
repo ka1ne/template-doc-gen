@@ -1,0 +1,42 @@
+template:  
+  name: Quickstart  
+  identifier: Quickstart  
+  versionLabel: v1  
+  type: Stage  
+  projectIdentifier: CD_Examples  
+  orgIdentifier: default  
+  tags: {}  
+  spec:  
+    type: Deployment  
+    spec:  
+      serviceConfig:  
+        serviceDefinition:  
+          type: Kubernetes  
+          spec:  
+            variables: []  
+        serviceRef: nginx  
+      infrastructure:  
+        infrastructureDefinition:  
+          type: KubernetesDirect  
+          spec:  
+            connectorRef: docbuilds  
+            namespace: default  
+            releaseName: release-<+INFRA_KEY_SHORT_ID>  
+        allowSimultaneousDeployments: false  
+        environmentRef: helmchart  
+      execution:  
+        steps:  
+          - step:  
+              type: K8sRollingDeploy  
+              name: Rolling  
+              identifier: Rolling  
+              spec:  
+                skipDryRun: false  
+              timeout: 10m  
+        rollbackSteps: []  
+    failureStrategies:  
+      - onFailure:  
+          errors:  
+            - AllErrors  
+          action:  
+            type: StageRollback 

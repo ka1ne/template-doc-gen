@@ -1,0 +1,26 @@
+template:
+  name: SimplePipeline
+  identifier: SimplePipeline
+  versionLabel: v1
+  type: Pipeline
+  projectIdentifier: default
+  orgIdentifier: default
+  tags: {}
+  spec:
+    stages:
+      - stage:
+          name: Build
+          identifier: Build
+          description: Build stage
+          type: CI
+          spec:
+            cloneCodebase: true
+            execution:
+              steps:
+                - step:
+                    type: Run
+                    name: Echo Hello
+                    identifier: EchoHello
+                    spec:
+                      shell: Bash
+                      command: echo "Hello, Harness!" 
