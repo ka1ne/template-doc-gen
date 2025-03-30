@@ -1,22 +1,42 @@
-# 📚 Harness Template Docs Generator
+# Harness Template Docs Generator
 
-> Automagically extract metadata from Harness templates and publish beautiful, searchable docs to Confluence.
+> Generate beautiful documentation from Harness templates automatically.
 
-![Version](https://img.shields.io/badge/version-0.0.1--alpha-blue)
+![Version](https://img.shields.io/badge/version-0.0.3--alpha-blue)
 ![Docker](https://img.shields.io/badge/docker-ready-brightgreen)
 
-## ✨ What It Does
+## What It Does
 
-Transforms your Harness templates into well-organized documentation:
+Transforms Harness templates into searchable HTML documentation, extracting metadata, parameters, variables, and examples while validating against official schemas.
 
-- 🔍 **Extracts** metadata, variables, parameters, and examples
-- 🎨 **Generates** beautiful HTML documentation with search capabilities
-- 🚀 **Publishes** directly to Confluence (optional)
-- 🔄 **Integrates** with your CI/CD pipelines via Harness stage templates
+## Features
 
-## 🚀 Quick Start
+- Modern, responsive design with dark mode support
+- Full-text search and type filtering
+- Syntax highlighting for code examples
+- Official schema validation
+- Docker-ready for CI/CD integration
 
-### Import the Stage Template
+## Quick Start
+
+### Option 1: Docker (Recommended)
+
+```bash
+# Run with helper script
+git clone https://github.com/your-org/harness-template-docs.git
+cd harness-template-docs
+./docker-run.sh
+```
+
+### Option 2: Manual Setup
+
+```bash
+# Local setup
+pip install -r requirements.txt
+python process_template.py --source templates --output docs/templates
+```
+
+### Option 3: Harness Pipeline
 
 ```yaml
 # In your Harness pipeline
@@ -25,80 +45,58 @@ stages:
       template:
         name: template-doc-gen
         identifier: templatedocgen
-        versionLabel: v0.0.1-alpha
+        versionLabel: v0.0.3-alpha
       variables:
         docker_registry_connector: your_connector_id
-        # Enable Confluence publishing (optional)
-        publish_to_confluence: true
 ```
 
-### Setup in 3 Steps
+## Configuration
 
-1. Import `templates/harness/template-doc-gen.yaml` to your Harness project
-2. Reference it in your pipeline (see above)
-3. For Confluence publishing, add these secrets:
-   - `confluence_url`, `confluence_username`, `confluence_token`
-   - `confluence_space`, `confluence_parent_id`
+Set options via `.env` file or command line arguments:
 
-## 📋 Template Variables
+```
+SOURCE_DIR=templates     # Where to find templates
+OUTPUT_DIR=docs/output   # Where to write docs
+FORMAT=html              # Output format
+VERBOSE=true             # Show detailed logs
+```
 
-| Variable | Purpose | Default |
-|----------|---------|---------|
-| `docker_registry_connector` | 🔗 Docker registry connector | **Required** |
-| `image_name` | 🐳 Image to use | `ka1ne/template-doc-gen:0.0.1-alpha` |
-| `source_dir` | 📁 Where to find templates | `templates` |
-| `output_dir` | 📂 Where to write docs | `docs/templates` |
-| `format` | 📄 Output format | `html` |
-| `publish_to_confluence` | 🚀 Auto-publish to Confluence | `false` |
+## Documentation Integration
 
-## 🧪 Local Development
-
-### Docker 
+### Static Web Hosting
 
 ```bash
-# Run with Docker
-docker run -v $(pwd)/templates:/app/templates -v $(pwd)/docs:/app/docs \
-  ka1ne/template-doc-gen:0.0.1-alpha --verbose
+# AWS S3
+aws s3 sync docs/output/ s3://your-bucket/templates-docs/ --acl public-read
+
+# GitHub Pages
+cp -r docs/output/* docs/
+git add docs && git commit -m "Update docs" && git push
 ```
 
-### Manual Setup
+### CI/CD Integration
 
-```bash
-# Local setup
-pip install -r requirements.txt
-cp .env.example .env  # Edit with your settings
+Use the included GitHub Actions workflow example to automatically generate docs on template changes.
 
-# Run manually
-python process_template.py --source templates --output docs/templates
-```
-
-## 🔗 Confluence Setup
-
-1. **Create API Token**: at https://id.atlassian.net/manage-profile/security/api-tokens
-2. **Get Page ID**: From URL - `https://your-domain.atlassian.net/wiki/spaces/SPACE/pages/123456789/Page+Name`
-3. **Add as Secrets**: Set up the required secrets in Harness
-
-## 💡 Best Practices
-
-- **Template Structure**: Include name, description, type, author, version and tags
-- **Run on Merge**: Setup webhooks to update docs automatically
-- **Use Secrets**: Never hardcode Confluence credentials
-- **Include Examples**: Make templates self-documenting with examples
-
-## 📖 Full Example
-
-For a complete implementation, see `templates/harness/example-usage.yaml`
-
-## 🛠️ Command Reference
+## Command Reference
 
 ```bash
 python process_template.py --help
 
 # Key Arguments
-  --source DIR          Source directory with templates  
-  --output DIR          Output directory for documentation
-  --format FMT          Output format (html|markdown|json)
-  --publish             Publish to Confluence
-  --verbose             Show detailed logs
+--source DIR    Source directory with templates  
+--output DIR    Output directory for documentation
+--format FMT    Output format (html|markdown|json)
+--verbose       Show detailed logs
+--validate      Validate templates without generating
 ```
 
+## Best Practices
+
+- Include name, description, type, author, version and tags in templates
+- Set up webhooks to update docs automatically on template changes
+- Make templates self-documenting with examples
+
+## Learn More
+
+For advanced usage, see the [Harness Schema](https://github.com/harness/harness-schema) documentation.
