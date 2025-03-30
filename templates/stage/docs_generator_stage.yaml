@@ -1,0 +1,140 @@
+name: Documentation Generator Stage
+description: Generates and publishes documentation from Harness templates to Confluence
+type: stage
+author: Harness Team
+version: 1.0.0
+tags:
+  - documentation
+  - confluence
+  - templates
+  - automation
+
+stage:
+  type: CI
+  variables:
+    source_dir:
+      type: string
+      description: Source directory containing templates
+      required: false
+      default: templates
+    output_dir:
+      type: string
+      description: Output directory for generated documentation
+      required: false
+      default: docs/templates
+    format:
+      type: string
+      description: Output format for documentation (html, markdown, json)
+      required: false
+      default: html
+    publish_to_confluence:
+      type: boolean
+      description: Whether to publish documentation to Confluence
+      required: false
+      default: false
+    confluence_url_secret:
+      type: string
+      description: Secret identifier for Confluence URL
+      required: false
+    confluence_username_secret:
+      type: string
+      description: Secret identifier for Confluence username
+      required: false
+    confluence_token_secret:
+      type: string
+      description: Secret identifier for Confluence API token
+      required: false
+    confluence_space_secret:
+      type: string
+      description: Secret identifier for Confluence space key
+      required: false
+    confluence_parent_id_secret:
+      type: string
+      description: Secret identifier for Confluence parent page ID
+      required: false
+    image_name:
+      type: string
+      description: Docker image name for documentation generator
+      required: false
+      default: harness-template-docs:latest
+    docker_registry_connector:
+      type: string
+      description: Connector ID for Docker registry
+      required: true
+
+  spec:
+    cloneCodebase: true
+    execution:
+      steps:
+        - step:
+            type: Run
+            name: Generate Documentation
+            identifier: generate_documentation
+            spec:
+              connectorRef: <+stage.variables.docker_registry_connector>
+              image: <+stage.variables.image_name>
+              command: |
+                python process_template.py \
+                  --source <+stage.variables.source_dir> \
+                  --output <+stage.variables.output_dir> \
+                  --format <+stage.variables.format> \
+                  <+stage.variables.publish_to_confluence == true ? "--publish" : ""> \
+                  <+stage.variables.confluence_url_secret != null ? "--confluence-url " + secrets.getValue(stage.variables.confluence_url_secret) : ""> \
+                  <+stage.variables.confluence_username_secret != null ? "--confluence-username " + secrets.getValue(stage.variables.confluence_username_secret) : ""> \
+                  <+stage.variables.confluence_token_secret != null ? "--confluence-token " + secrets.getValue(stage.variables.confluence_token_secret) : ""> \
+                  <+stage.variables.confluence_space_secret != null ? "--confluence-space " + secrets.getValue(stage.variables.confluence_space_secret) : ""> \
+                  <+stage.variables.confluence_parent_id_secret != null ? "--confluence-parent-id " + secrets.getValue(stage.variables.confluence_parent_id_secret) : ""> \
+                  --verbose
+              privileged: false
+              shell: Sh
+              envVariables:
+                PYTHONUNBUFFERED: "1"
+              resources:
+                limits:
+                  memory: 512Mi
+                  cpu: 500m
+    platform:
+      os: Linux
+      arch: Amd64
+    runtime:
+      type: Cloud
+      spec: {}
+    caching:
+      enabled: true
+      paths:
+        - <+stage.variables.output_dir>
+
+examples:
+  - |
+    # Basic usage in pipeline with Docker Hub image
+    stages:
+      - stage:
+          template:
+            name: Documentation Generator Stage
+            identifier: docs_generator_stage
+            versionLabel: 1.0.0
+          variables:
+            docker_registry_connector: docker_hub_connector
+            image_name: harness/template-docs:latest
+            source_dir: templates
+            output_dir: docs/templates
+  - |
+    # Complete usage with Confluence publishing
+    stages:
+      - stage:
+          template:
+            name: Documentation Generator Stage
+            identifier: docs_generator_stage
+            versionLabel: 1.0.0
+          variables:
+            docker_registry_connector: docker_hub_connector
+            image_name: harness/template-docs:latest
+            source_dir: templates
+            output_dir: docs/templates
+            format: html
+            publish_to_confluence: true
+            confluence_url_secret: confluence_url
+            confluence_username_secret: confluence_username
+            confluence_token_secret: confluence_token
+            confluence_space_secret: confluence_space
+            confluence_parent_id_secret: confluence_parent_id 

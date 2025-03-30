@@ -1,18 +1,123 @@
 # Harness Template Documentation Generator
 
-A tool that automatically extracts and generates documentation from Harness templates with Confluence integration.
+A tool that automatically extracts and generates documentation from Harness templates with Confluence integration, packaged as a ready-to-use stage template.
 
 ## Overview
 
-This documentation generator analyzes Harness YAML templates (pipeline, stage, and stepgroup) and:
-1. Extracts metadata, variables, parameters, and examples
-2. Generates searchable HTML documentation 
-3. Publishes to Confluence (optional)
-4. Integrates seamlessly with Harness CI/CD pipelines
+This documentation generator analyzes Harness YAML templates and creates organized, searchable documentation by:
+1. Extracting metadata, variables, parameters, and examples
+2. Generating HTML documentation with search and filtering 
+3. Publishing to Confluence (optional)
 
-## Best Practices
+## Using the Stage Template
 
-### Template Structure
+This project provides a ready-to-use Harness stage template that you can add to any pipeline.
+
+### 1. Add the Template to Your Harness Project
+
+Copy the stage template to your Harness project:
+- Source file: `templates/stage/docs_generator_stage.yaml`
+- Import it through the Harness UI or CLI
+
+### 2. Add the Stage to Your Pipeline
+
+```yaml
+stages:
+  - stage:
+      template:
+        name: Documentation Generator Stage
+        identifier: docs_generator_stage
+        versionLabel: 1.0.0
+      variables:
+        docker_registry_connector: your_docker_connector_id
+        image_name: harness-template-docs:latest
+        source_dir: templates
+        output_dir: docs/templates
+```
+
+### 3. Enable Confluence Publishing (Optional)
+
+```yaml
+stages:
+  - stage:
+      template:
+        name: Documentation Generator Stage
+        identifier: docs_generator_stage
+        versionLabel: 1.0.0
+      variables:
+        docker_registry_connector: your_docker_connector_id
+        image_name: harness-template-docs:latest
+        source_dir: templates
+        output_dir: docs/templates
+        publish_to_confluence: true
+        confluence_url_secret: confluence_url
+        confluence_username_secret: confluence_username
+        confluence_token_secret: confluence_token
+        confluence_space_secret: confluence_space
+        confluence_parent_id_secret: confluence_parent_id
+```
+
+### 4. Configure Secrets
+
+Create the following secrets in your Harness project if using Confluence:
+- `confluence_url`
+- `confluence_username`
+- `confluence_token`
+- `confluence_space`
+- `confluence_parent_id`
+
+## Stage Template Variables
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `source_dir` | Directory containing templates | `templates` | No |
+| `output_dir` | Output directory for documentation | `docs/templates` | No |
+| `format` | Output format (html, markdown, json) | `html` | No |
+| `publish_to_confluence` | Whether to publish to Confluence | `false` | No |
+| `confluence_url_secret` | Secret for Confluence URL | | No |
+| `confluence_username_secret` | Secret for Confluence username | | No |
+| `confluence_token_secret` | Secret for Confluence API token | | No |
+| `confluence_space_secret` | Secret for Confluence space key | | No |
+| `confluence_parent_id_secret` | Secret for Confluence parent page ID | | No |
+| `image_name` | Docker image name | `harness-template-docs:latest` | No |
+| `docker_registry_connector` | Connector ID for Docker registry | | Yes |
+
+## Local Development
+
+If you need to run or develop the tool outside of Harness:
+
+### Setup Environment
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Configure environment
+cp .env.example .env
+# Edit .env with your settings
+```
+
+### Run Locally
+
+```bash
+# Using helper script
+./publish-to-confluence.sh
+
+# Or using Python directly
+python process_template.py --source templates --output docs/templates --format html
+```
+
+### Docker Usage
+
+```bash
+# Build container
+docker build -t harness-template-docs .
+
+# Run with volume mounts
+docker run -v $(pwd)/templates:/app/templates -v $(pwd)/docs:/app/docs harness-template-docs --verbose
+```
+
+## Template Requirements
 
 For optimal documentation, ensure your templates follow this structure:
 
@@ -35,166 +140,33 @@ examples:
     # ...
 ```
 
-### Documentation Generation
-
-* **Validate Templates**: Use the `--validate` flag to check templates before generating docs
-* **Format Options**: Choose between HTML (default), Markdown, or JSON outputs
-* **Include Examples**: Add clear examples to your templates for better documentation
-* **Organize Output**: Structure output by template type (pipeline/stage/stepgroup)
-
-### Confluence Integration
-
-* **Secure Credentials**: Store API tokens in Harness secrets, not in code
-* **Parent Pages**: Create a dedicated parent page in Confluence for template docs
-* **Regular Updates**: Schedule documentation generation after merge to main
-* **Error Handling**: Check logs after publishing to verify successful uploads
-
-## Quick Start Guide
-
-### Local Development
-
-1. **Setup Environment**:
-   ```bash
-   # Install dependencies
-   pip install -r requirements.txt
-   
-   # Configure environment
-   cp .env.example .env
-   # Edit .env with your settings
-   ```
-
-2. **Generate Documentation**:
-   ```bash
-   # Quick generation with helper script
-   ./publish-to-confluence.sh
-   
-   # Or customize with Python
-   python process_template.py --source templates --output docs/templates --format html
-   ```
-
-3. **Docker Deployment**:
-   ```bash
-   # Build container
-   docker build -t harness-template-docs .
-   
-   # Run with volume mounts
-   docker run -v $(pwd)/templates:/app/templates -v $(pwd)/docs:/app/docs harness-template-docs --verbose
-   ```
-
-## Harness Pipeline Integration
-
-### Complete Example Pipeline
-
-The following example demonstrates a complete pipeline setup with best practices:
-
-```yaml
-pipeline:
-  name: Update Template Documentation
-  identifier: update_template_documentation
-  projectIdentifier: <+project.identifier>
-  orgIdentifier: <+org.identifier>
-  tags: {}
-  stages:
-    - stage:
-        name: Generate and Publish Documentation
-        identifier: generate_and_publish_documentation
-        type: CI
-        spec:
-          cloneCodebase: true
-          execution:
-            steps:
-              - step:
-                  type: Run
-                  name: Generate Template Documentation
-                  identifier: generate_template_documentation
-                  spec:
-                    connectorRef: <+variables.docker_registry_connector>
-                    image: <+variables.image_name>
-                    command: |
-                      python process_template.py \
-                        --source /harness/input/codebase/templates \
-                        --output /harness/output/docs \
-                        --format html \
-                        --publish \
-                        --confluence-url <+secrets.getValue("confluence_url")> \
-                        --confluence-username <+secrets.getValue("confluence_username")> \
-                        --confluence-token <+secrets.getValue("confluence_token")> \
-                        --confluence-space <+secrets.getValue("confluence_space")> \
-                        --confluence-parent-id <+secrets.getValue("confluence_parent_id")> \
-                        --verbose
-                    privileged: false
-                    shell: Sh
-                    envVariables:
-                      PYTHONUNBUFFERED: "1"
-                    resources:
-                      limits:
-                        memory: 512Mi
-                        cpu: 500m
-          platform:
-            os: Linux
-            arch: Amd64
-          runtime:
-            type: Cloud
-            spec: {}
-          caching:
-            enabled: true
-            paths:
-              - /harness/output/docs
-  properties:
-    ci:
-      codebase:
-        connectorRef: <+variables.git_connector>
-        repoName: <+variables.repo_name>
-        build: <+input>
-
-variables:
-  - name: docker_registry_connector
-    type: String
-    description: Connector ID for Docker registry
-    required: true
-  - name: git_connector
-    type: String
-    description: Connector ID for Git repository
-    required: true
-  - name: repo_name
-    type: String
-    description: Name of the repository containing Harness templates
-    required: true
-  - name: image_name
-    type: String
-    description: Docker image name for documentation generator
-    required: true
-    value: harness-template-docs:latest
-```
-
-### Key Pipeline Features
-
-1. **Resource Limits**: Sets memory (512Mi) and CPU (500m) limits for efficient execution
-2. **Caching**: Enables caching of documentation output for faster builds
-3. **Secrets Management**: Uses Harness secrets for all sensitive credentials
-4. **Environment Variables**: Sets PYTHONUNBUFFERED for improved logging
-5. **Variables**: Defines required connectors and values with descriptive comments
-
 ## Confluence Setup
 
-1. **API Token Generation**:
-   - Navigate to: https://id.atlassian.net/manage-profile/security/api-tokens
-   - Create a token named "Harness Template Documentation"
-   - Store in Harness secrets management
+1. **Generate API Token**:
+   - Go to: https://id.atlassian.net/manage-profile/security/api-tokens
+   - Create token named "Harness Template Documentation"
 
-2. **Page Structure**:
-   - Create a parent page for all template documentation
-   - Find the page ID in the URL: `https://your-domain.atlassian.net/wiki/spaces/SPACE/pages/123456789/Page+Name`
-   - Use this ID as the parent page ID in configuration
+2. **Find Parent Page ID**:
+   - The ID is in the Confluence page URL: `https://your-domain.atlassian.net/wiki/spaces/SPACE/pages/123456789/Page+Name`
+   - ID in this example: `123456789`
 
-3. **Environment Configuration**:
+3. **Store in Harness Secrets**:
+   Create the following secrets in your Harness project:
    ```
-   CONFLUENCE_URL=https://your-domain.atlassian.net
-   CONFLUENCE_USERNAME=your-username@example.com
-   CONFLUENCE_API_TOKEN="YOUR_API_TOKEN_HERE"
-   CONFLUENCE_SPACE_KEY=YOUR_SPACE_KEY
-   CONFLUENCE_PARENT_PAGE_ID=123456789
+   confluence_url = https://your-domain.atlassian.net
+   confluence_username = your-username@example.com
+   confluence_token = YOUR_API_TOKEN_HERE
+   confluence_space = YOUR_SPACE_KEY
+   confluence_parent_id = 123456789
    ```
+
+## Best Practices
+
+- **Schedule Regular Updates**: Run the documentation pipeline after merges to main
+- **Validate Templates**: Use the `--validate` flag to check templates without generating docs
+- **Include Examples**: Add clear examples to your templates for better documentation
+- **Secure Credentials**: Always use Harness secrets for sensitive information
+- **Check Logs**: Verify successful publishing by checking pipeline logs
 
 ## Command Reference
 
