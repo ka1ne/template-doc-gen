@@ -1,16 +1,55 @@
 # Harness Template Documentation Generator
 
-Automatically generates documentation from Harness templates and publishes to Confluence. Designed to run within Harness pipelines after merges to main.
+Automatically extracts and generates documentation from Harness templates, with optional publishing to Confluence. Designed to run within Harness pipelines.
 
-## Features
+## Overview
 
-- Processes pipeline, stage, and stepgroup templates
-- Extracts metadata, variables, parameters, and examples
-- Generates HTML documentation with search and filtering
-- Publishes directly to Confluence
-- Runs in Harness pipelines
+This tool analyzes Harness template YAML files (pipeline, stage, and stepgroup) to extract:
+- Template metadata (name, type, version, author)
+- Variables and parameters with descriptions
+- Usage examples
+- Steps and configurations
 
-## Usage in Harness Pipeline
+The extracted information is organized into searchable HTML documentation that can be:
+- Generated locally for reference
+- Published directly to Confluence for team visibility
+- Integrated into CI/CD pipelines
+
+## Quick Start
+
+### Local Development
+
+1. **Setup Environment**:
+   ```bash
+   # Clone repository and install dependencies
+   pip install -r requirements.txt
+   
+   # Create .env file (copy from .env.example)
+   cp .env.example .env
+   # Edit .env with your settings
+   ```
+
+2. **Generate Documentation**:
+   ```bash
+   # Using helper script
+   ./publish-to-confluence.sh
+   
+   # Or using Python directly
+   python process_template.py --source templates --output docs/templates --format html
+   ```
+
+3. **Using Docker**:
+   ```bash
+   # Build image
+   docker build -t harness-template-docs .
+   
+   # Run container
+   docker run -v $(pwd)/templates:/app/templates -v $(pwd)/docs:/app/docs harness-template-docs --verbose
+   ```
+
+## Harness Pipeline Integration
+
+Add this step to your pipeline to automatically update documentation:
 
 ```yaml
 - step:
@@ -34,61 +73,23 @@ Automatically generates documentation from Harness templates and publishes to Co
           --verbose
 ```
 
-## Local Development
+## Confluence Setup
 
-### Environment Setup
+1. **Generate API Token**:
+   - Go to: https://id.atlassian.net/manage-profile/security/api-tokens
+   - Create token named "Harness Template Documentation"
 
-Create a `.env` file with your Confluence credentials:
+2. **Find Parent Page ID**:
+   - Open your Confluence space
+   - The ID is in the URL: `https://your-domain.atlassian.net/wiki/spaces/SPACE/pages/123456789/Page+Name`
+   - ID in this example: `123456789`
 
-```
-# Confluence Configuration
-CONFLUENCE_URL=https://your-domain.atlassian.net
-CONFLUENCE_USERNAME=your-username@example.com
-CONFLUENCE_API_TOKEN="YOUR_API_TOKEN_HERE"
-CONFLUENCE_SPACE_KEY=YOUR_SPACE_KEY
-CONFLUENCE_PARENT_PAGE_ID=123456789
+3. **Configure Environment**:
+   - Set variables in `.env` file or Harness secrets
 
-# Processing Options
-SOURCE_DIR=templates
-OUTPUT_DIR=docs/templates
-FORMAT=html
-VERBOSE=true
-PUBLISH=true
-VALIDATE_ONLY=false
-```
+## Template Requirements
 
-### Using Docker
-
-```bash
-# Build
-docker build -t harness-template-docs .
-
-# Run locally
-docker run -v $(pwd)/templates:/app/templates -v $(pwd)/docs:/app/docs harness-template-docs --verbose
-```
-
-### Using Helper Script
-
-```bash
-./publish-to-confluence.sh
-```
-
-## Setting Up Confluence Integration
-
-### API Token
-
-1. Go to: https://id.atlassian.com/manage-profile/security/api-tokens
-2. Create a new API token named "Harness Template Documentation"
-3. Store the token in Harness secrets
-
-### Finding Your Parent Page ID
-
-The page ID appears in the URL when viewing a Confluence page:
-`https://your-domain.atlassian.net/wiki/spaces/SPACE/pages/123456789/Page+Name`
-
-In this example, the page ID is `123456789`.
-
-## Template Structure
+Templates must include these fields:
 
 ```yaml
 name: Template Name
@@ -100,35 +101,32 @@ tags:
   - tag1
   - tag2
 
-# Template-specific structure
-# ...
+# Template structure goes here...
 
-# Examples of usage
+# Optional usage examples
 examples:
   - |
-    # Example usage
+    # Example code
     # ...
 ```
 
-## Directory Structure
+## Command Line Options
 
 ```
-harness-template-docs/
-├── Dockerfile
-├── README.md
-├── main.py
-├── process_template.py
-├── publish-to-confluence.sh
-├── harness-step-example.yaml
-├── requirements.txt
-├── src/
-│   └── utils/
-│       ├── template_html.py
-│       └── confluence_publisher.py
-└── templates/
-    ├── pipeline/
-    ├── stage/
-    └── stepgroup/
+python process_template.py --help
+
+Arguments:
+  --source, -s            Source directory containing templates
+  --output, -o            Output directory for documentation
+  --format, -f            Output format (html, markdown, json)
+  --validate, -v          Validate templates without generating docs
+  --verbose               Enable detailed logging
+  --publish, -p           Publish to Confluence
+  --confluence-url        Confluence URL
+  --confluence-username   Confluence username
+  --confluence-token      Confluence API token
+  --confluence-space      Confluence space key
+  --confluence-parent-id  Confluence parent page ID
 ```
 
 ## License
