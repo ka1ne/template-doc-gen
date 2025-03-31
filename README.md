@@ -72,6 +72,9 @@ python process_template.py --help
 --validate      Validate templates without generating
 ```
 
+## ToDo
+- Detect changes & have a *"what's changed"* section
+
 ## Learn More
 
 For advanced usage, see the [Harness Schema](https://github.com/harness/harness-schema) documentation.
