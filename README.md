@@ -8,6 +8,9 @@
 
 Transforms Harness templates into searchable HTML documentation, extracting metadata, parameters, variables, and examples while validating against official schemas.
 
+![demo-gif](https://github.com/user-attachments/assets/c96991bf-9846-483b-8fc2-f5271d70926a)
+
+
 ## Quick Start
 
 ### Option 1: Docker (Recommended)
