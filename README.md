@@ -1,12 +1,15 @@
 # Harness Template Docs Generator
 
-> Generate beautiful documentation from Harness templates automatically.
+> Generate documentation from Harness templates automatically.
 
 [![Version](https://img.shields.io/badge/version-0.0.3--alpha-blue)](https://hub.docker.com/repository/docker/ka1ne/template-doc-gen/tags/0.0.3-alpha/sha256:af1c5885d18f1b3e7d758da1427cb890005af62d05cb28a9f218766d39b0ff9e)
 
 ## What It Does
 
 Transforms Harness templates into searchable HTML documentation, extracting metadata, parameters, variables, and examples while validating against official schemas.
+
+![demo-gif](https://github.com/user-attachments/assets/c96991bf-9846-483b-8fc2-f5271d70926a)
+
 
 ## Quick Start
 
@@ -68,6 +71,9 @@ python process_template.py --help
 --verbose       Show detailed logs
 --validate      Validate templates without generating
 ```
+
+## ToDo
+- Detect changes & have a *"what's changed"* section
 
 ## Learn More
 
