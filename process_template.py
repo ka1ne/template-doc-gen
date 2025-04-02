@@ -69,31 +69,33 @@ def get_harness_schema(schema_type="pipeline"):
     """Fetch the Harness schema from GitHub or use cached version."""
     if schema_type not in schema_cache:
         try:
-            # Map to the correct schema file
-            # The Harness repo has pipeline.json, template.json, and trigger.json
-            schema_file = "pipeline.json"  # Default
+            # Map schema types to their corresponding files
+            schema_mapping = {
+                "pipeline": "pipeline.json",
+                "stage": "template.json",  # Stages are defined in template.json
+                "step": "template.json",   # Steps are defined in template.json
+                "stepgroup": "template.json",  # StepGroups are defined in template.json
+                "trigger": "trigger.json"
+            }
             
-            if schema_type == "stage" or schema_type == "step":
-                # Stages and steps are defined in the template.json schema
-                schema_file = "template.json"
-            elif schema_type == "trigger":
-                schema_file = "trigger.json"
+            schema_file = schema_mapping.get(schema_type.lower(), "pipeline.json")
+            logger.debug(f"Using schema file {schema_file} for type {schema_type}")
                 
-            # Default to v0 schema
-            schema_url = f"https://raw.githubusercontent.com/harness/harness-schema/main/v0/{schema_file}"
+            # Use v1 schema
+            schema_url = f"https://raw.githubusercontent.com/harness/harness-schema/main/v1/{schema_file}"
             logger.debug(f"Fetching schema from {schema_url}")
             
             response = requests.get(schema_url)
             if response.status_code == 200:
-                schema_cache[schema_type] = response.json()
+                raw_schema = response.json()
+                # The v1 schema has a different structure - it's directly the schema we need
+                schema_cache[schema_type] = raw_schema
                 logger.debug(f"Successfully fetched {schema_type} schema using {schema_file}")
             else:
                 logger.error(f"Failed to fetch schema: {response.status_code} from URL {schema_url}")
-                # Use empty schema as fallback
                 schema_cache[schema_type] = {}
         except Exception as e:
             logger.error(f"Error fetching schema: {e}")
-            # Use empty schema as fallback
             schema_cache[schema_type] = {}
     
     return schema_cache[schema_type]
@@ -971,97 +973,83 @@ def generate_css(output_dir):
     with open(css_path, 'w') as file:
         file.write(css)
 
-def extract_template_metadata(template_data):
-    """Extract metadata from Harness template including variables and descriptions."""
+def extract_template_metadata(template_data, schema=None):
+    """Extract metadata from Harness template using schema-driven approach."""
     try:
-        # For the Harness template format where template is a root key
-        if 'template' in template_data and isinstance(template_data['template'], dict):
-            template_obj = template_data['template']
-            
-            # Determine template type
-            template_type = None
+        # Get the appropriate schema if not provided
+        if schema is None:
+            template_obj = template_data.get('template', template_data)
+            schema_type = "pipeline"  # Default
             if 'type' in template_obj:
-                if template_obj['type'] in ['Stage', 'Pipeline', 'StepGroup']:
-                    template_type = template_obj['type'].lower()
-            
-            # Extract variables from spec sections
-            variables = {}
-            parameters = {}
-            
-            # Try to extract variables and parameters from the spec if available
-            if 'spec' in template_obj:
-                spec = template_obj['spec']
-                if 'serviceConfig' in spec.get('spec', {}):
-                    service_config = spec['spec']['serviceConfig']
-                    if 'serviceDefinition' in service_config:
-                        service_def = service_config['serviceDefinition']
-                        if 'spec' in service_def and 'variables' in service_def['spec']:
-                            for var in service_def['spec'].get('variables', []):
-                                if isinstance(var, dict) and 'name' in var:
-                                    variables[var['name']] = {
-                                        'description': var.get('description', ''),
-                                        'type': var.get('type', 'string'),
-                                        'required': var.get('required', False),
-                                        'scope': 'stage'
-                                    }
-                
-                # Extract step parameters if present
-                if 'execution' in spec.get('spec', {}):
-                    execution = spec['spec']['execution']
-                    if 'steps' in execution:
-                        for step in execution['steps']:
-                            if 'step' in step and 'spec' in step['step']:
-                                step_spec = step['step']['spec']
-                                for param_name, param_value in step_spec.items():
-                                    parameters[param_name] = {
-                                        'description': f"Parameter for {step['step'].get('name', 'step')}",
-                                        'type': 'boolean' if isinstance(param_value, bool) else 'string',
-                                        'required': False,
-                                        'default': param_value,
-                                        'scope': 'step'
-                                    }
-            
-            # Extract tags
-            tags = []
-            if 'tags' in template_obj and template_obj['tags']:
-                if isinstance(template_obj['tags'], dict):
-                    # If tags are key-value pairs
-                    for tag_key, tag_value in template_obj['tags'].items():
-                        tags.append(tag_key)
-                        if tag_value and str(tag_value).strip():
-                            tags.append(str(tag_value))
-                elif isinstance(template_obj['tags'], list):
-                    # If tags are a list
-                    tags.extend(template_obj['tags'])
-            
-            metadata = {
-                'name': template_obj.get('name', 'Unnamed Template'),
-                'type': template_type or 'stage',  # Default to stage if unknown
-                'variables': variables,
-                'parameters': parameters,
-                'description': template_obj.get('description', f"Harness {template_type or 'stage'} template"),
-                'tags': tags,
-                'author': 'Harness',
-                'version': template_obj.get('versionLabel', '1.0.0'),
-                'examples': []
-            }
-            return metadata
-        
-        # For older templates with direct metadata
-        return {
-            'name': template_data.get('name', 'Unnamed Template'),
-            'type': template_data.get('type', 'unknown'),
-            'variables': template_data.get('variables', {}),
-            'parameters': template_data.get('parameters', {}),
-            'description': template_data.get('description', ''),
-            'tags': template_data.get('tags', []),
-            'author': template_data.get('author', ''),
-            'version': template_data.get('version', '1.0.0'),
-            'examples': template_data.get('examples', [])
+                if template_obj['type'] == "Stage":
+                    schema_type = "stage"
+                elif template_obj['type'] == "Pipeline":
+                    schema_type = "pipeline"
+                elif template_obj['type'] == "StepGroup":
+                    schema_type = "step"
+            schema = get_harness_schema(schema_type)
+
+        # Initialize metadata structure
+        metadata = {
+            'name': 'Unnamed Template',
+            'type': 'unknown',
+            'variables': {},
+            'parameters': {},
+            'description': '',
+            'tags': [],
+            'author': 'Harness',
+            'version': '1.0.0',
+            'examples': []
         }
+
+        # Extract template object (handle both formats)
+        template_obj = template_data.get('template', template_data)
+        
+        # Use jsonschema to validate and extract data
+        try:
+            # First validate against the schema
+            jsonschema.validate(template_obj, schema)
+            
+            # Get the properties from the schema
+            properties = schema.get('properties', {})
+            
+            # Extract fields based on schema properties
+            for field, field_schema in properties.items():
+                if field in template_obj:
+                    value = template_obj[field]
+                    field_type = field_schema.get('type', 'string')
+                    
+                    # Map schema fields to metadata
+                    if field == 'name':
+                        metadata['name'] = value
+                    elif field == 'type':
+                        metadata['type'] = value.lower()
+                    elif field == 'description':
+                        metadata['description'] = value
+                    elif field == 'version':
+                        metadata['version'] = str(value)
+                    elif field == 'tags':
+                        metadata['tags'] = value if isinstance(value, list) else []
+                    elif field == 'spec':
+                        # Extract spec metadata using the spec schema
+                        spec_schema = field_schema
+                        spec_metadata = extract_spec_metadata(value, spec_schema)
+                        metadata['variables'].update(spec_metadata.get('variables', {}))
+                        metadata['parameters'].update(spec_metadata.get('parameters', {}))
+
+        except jsonschema.exceptions.ValidationError as e:
+            logger.warning(f"Schema validation warning: {e}")
+            # Continue with basic extraction if validation fails
+            metadata['name'] = template_obj.get('name', 'Unnamed Template')
+            metadata['type'] = template_obj.get('type', 'unknown').lower()
+            metadata['description'] = template_obj.get('description', '')
+            metadata['version'] = str(template_obj.get('version', '1.0.0'))
+            metadata['tags'] = template_obj.get('tags', [])
+
+        return metadata
+
     except Exception as e:
         logger.error(f"Error extracting metadata: {e}")
-        # Return basic metadata to avoid complete failure
         return {
             'name': template_data.get('name', 'Unnamed Template'),
             'type': 'unknown',
@@ -1073,6 +1061,90 @@ def extract_template_metadata(template_data):
             'version': '1.0.0',
             'examples': []
         }
+
+def extract_spec_metadata(spec_data, schema):
+    """Extract metadata from spec section using schema."""
+    metadata = {'variables': {}, 'parameters': {}}
+    
+    try:
+        # Get the spec properties from the schema
+        spec_properties = schema.get('properties', {})
+        
+        # Extract variables if present in schema
+        if 'variables' in spec_properties:
+            variables_schema = spec_properties['variables']
+            if 'items' in variables_schema:
+                item_schema = variables_schema['items']
+                if 'properties' in item_schema:
+                    for var in spec_data.get('variables', []):
+                        if isinstance(var, dict) and 'name' in var:
+                            try:
+                                # Validate variable against schema
+                                jsonschema.validate(var, item_schema)
+                                metadata['variables'][var['name']] = {
+                                    'description': var.get('description', ''),
+                                    'type': var.get('type', 'string'),
+                                    'required': var.get('required', False),
+                                    'scope': 'template'
+                                }
+                            except jsonschema.exceptions.ValidationError:
+                                continue
+
+        # Extract parameters if present in schema
+        if 'parameters' in spec_properties:
+            params_schema = spec_properties['parameters']
+            if 'items' in params_schema:
+                item_schema = params_schema['items']
+                if 'properties' in item_schema:
+                    for param in spec_data.get('parameters', []):
+                        if isinstance(param, dict) and 'name' in param:
+                            try:
+                                # Validate parameter against schema
+                                jsonschema.validate(param, item_schema)
+                                metadata['parameters'][param['name']] = {
+                                    'description': param.get('description', ''),
+                                    'type': param.get('type', 'string'),
+                                    'required': param.get('required', False),
+                                    'default': param.get('default'),
+                                    'scope': 'template'
+                                }
+                            except jsonschema.exceptions.ValidationError:
+                                continue
+
+        # Extract service variables if present in schema
+        if 'serviceConfig' in spec_properties:
+            service_schema = spec_properties['serviceConfig']
+            if 'properties' in service_schema:
+                service_props = service_schema['properties']
+                if 'serviceDefinition' in service_props:
+                    service_def_schema = service_props['serviceDefinition']
+                    if 'properties' in service_def_schema:
+                        spec_schema = service_def_schema['properties'].get('spec', {})
+                        if 'properties' in spec_schema:
+                            variables_schema = spec_schema['properties'].get('variables', {})
+                            if 'items' in variables_schema:
+                                item_schema = variables_schema['items']
+                                if 'properties' in item_schema:
+                                    service_config = spec_data.get('serviceConfig', {})
+                                    service_def = service_config.get('serviceDefinition', {})
+                                    for var in service_def.get('spec', {}).get('variables', []):
+                                        if isinstance(var, dict) and 'name' in var:
+                                            try:
+                                                # Validate service variable against schema
+                                                jsonschema.validate(var, item_schema)
+                                                metadata['variables'][var['name']] = {
+                                                    'description': var.get('description', ''),
+                                                    'type': var.get('type', 'string'),
+                                                    'required': var.get('required', False),
+                                                    'scope': 'service'
+                                                }
+                                            except jsonschema.exceptions.ValidationError:
+                                                continue
+
+    except Exception as e:
+        logger.error(f"Error extracting spec metadata: {e}")
+    
+    return metadata
 
 def main():
     """Main function to handle command-line invocation."""
