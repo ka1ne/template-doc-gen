@@ -1,7 +1,19 @@
 import re
+import yaml
+import json
 
 def generate_template_html(template_metadata):
     """Generate HTML documentation for a Harness template."""
+    # Get the raw template code from the template_metadata
+    template_code = template_metadata.get('raw_template', '')
+    
+    # Format template code nicely for YAML
+    if template_code and isinstance(template_code, dict):
+        try:
+            template_code = yaml.dump(template_code, default_flow_style=False, sort_keys=False)
+        except Exception as e:
+            template_code = json.dumps(template_code, indent=2)
+    
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -14,6 +26,11 @@ def generate_template_html(template_metadata):
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
+    <div class="theme-toggle" id="theme-toggle" title="Toggle dark/light mode">
+        <i class="fas fa-moon dark-icon"></i>
+        <i class="fas fa-sun light-icon"></i>
+    </div>
+
     <div class="sidebar">
         <div class="sidebar-header">
             <h3><i class="fas fa-layer-group"></i> Harness Templates</h3>
@@ -23,6 +40,7 @@ def generate_template_html(template_metadata):
             <a href="../pipeline/"><i class="fas fa-sitemap"></i> Pipelines</a>
             <a href="../stage/"><i class="fas fa-cube"></i> Stages</a>
             <a href="../stepgroup/"><i class="fas fa-cubes"></i> Step Groups</a>
+            <a href="../step/"><i class="fas fa-cog"></i> Steps</a>
         </div>
     </div>
     
@@ -149,6 +167,43 @@ def generate_template_html(template_metadata):
     else:
         html += '<p class="empty-state"><i class="fas fa-info-circle"></i> No variables defined for this template.</p>'
     
+    # Add template code section
+    html += """
+                <div class="template-code-section">
+                    <h2>Template Code</h2>
+    """
+    
+    if template_code:
+        # Generate a safe filename for download based on template name
+        safe_filename = re.sub(r'[^a-zA-Z0-9_\-]', '_', template_metadata['name'].lower()) + '.yaml'
+        
+        html += f"""
+                    <div class="code-container">
+                        <div class="code-header">
+                            <div class="code-title">
+                                <i class="fas fa-file-code"></i> {safe_filename}
+                            </div>
+                            <div class="code-actions">
+                                <button class="code-action-btn" id="copy-btn" data-clipboard-target="#template-code">
+                                    <i class="fas fa-copy"></i> <span>Copy</span>
+                                </button>
+                                <button class="code-action-btn" id="download-btn" data-filename="{safe_filename}">
+                                    <i class="fas fa-download"></i> <span>Download</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="code-block line-numbers">
+                            <pre><code class="language-yaml" id="template-code">{template_code}</code></pre>
+                        </div>
+                    </div>
+        """
+    else:
+        html += '<p class="empty-state"><i class="fas fa-info-circle"></i> No template code available.</p>'
+    
+    html += """
+                </div>
+    """
+    
     # Add examples section if available
     if template_metadata.get('examples'):
         html += """
@@ -180,6 +235,8 @@ def generate_template_html(template_metadata):
     </div>
     
     <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/highlight.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/languages/yaml.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.11/dist/clipboard.min.js"></script>
     <script>
         document.getElementById('generation-date').textContent = new Date().toLocaleDateString('en-US', { 
             year: 'numeric', 
@@ -189,9 +246,62 @@ def generate_template_html(template_metadata):
         
         // Initialize syntax highlighting
         document.addEventListener('DOMContentLoaded', (event) => {
-            document.querySelectorAll('pre code').forEach((el) => {
-                hljs.highlightElement(el);
-            });
+            hljs.highlightAll();
+        });
+        
+        // Copy to clipboard functionality
+        const clipboard = new ClipboardJS('#copy-btn');
+        
+        clipboard.on('success', function(e) {
+            const copyBtn = document.getElementById('copy-btn');
+            const originalText = copyBtn.innerHTML;
+            
+            copyBtn.innerHTML = '<i class="fas fa-check"></i> <span>Copied!</span>';
+            setTimeout(() => {
+                copyBtn.innerHTML = originalText;
+            }, 2000);
+            
+            e.clearSelection();
+        });
+        
+        // Download functionality
+        document.getElementById('download-btn').addEventListener('click', function() {
+            const codeContent = document.getElementById('template-code').textContent;
+            const filename = this.getAttribute('data-filename');
+            const blob = new Blob([codeContent], { type: 'text/yaml' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 0);
+        });
+        
+        // Theme toggle functionality
+        const themeToggle = document.getElementById('theme-toggle');
+        
+        // Check for saved theme preference or use the system preference
+        const prefersDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        
+        if (localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && prefersDarkMode)) {
+            document.body.classList.add('dark-mode');
+        }
+        
+        themeToggle.addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+            
+            // Save preference to localStorage
+            if (document.body.classList.contains('dark-mode')) {
+                localStorage.setItem('theme', 'dark');
+            } else {
+                localStorage.setItem('theme', 'light');
+            }
         });
     </script>
 </body>
@@ -222,6 +332,7 @@ def generate_index_html(templates_metadata):
             <a href="pipeline/"><i class="fas fa-sitemap"></i> Pipelines</a>
             <a href="stage/"><i class="fas fa-cube"></i> Stages</a>
             <a href="stepgroup/"><i class="fas fa-cubes"></i> Step Groups</a>
+            <a href="step/"><i class="fas fa-cog"></i> Steps</a>
         </div>
     </div>
     
@@ -237,6 +348,7 @@ def generate_index_html(templates_metadata):
                     <button class="filter-btn" data-filter="pipeline">Pipelines</button>
                     <button class="filter-btn" data-filter="stage">Stages</button>
                     <button class="filter-btn" data-filter="stepgroup">Step Groups</button>
+                    <button class="filter-btn" data-filter="step">Steps</button>
                 </div>
             </div>
         </header>
@@ -250,6 +362,8 @@ def generate_index_html(templates_metadata):
     pipelines = []
     stages = []
     stepgroups = []
+    steps = []
+    others = []
     
     for metadata in templates_metadata:
         if metadata['type'] == 'pipeline':
@@ -258,14 +372,20 @@ def generate_index_html(templates_metadata):
             stages.append(metadata)
         elif metadata['type'] == 'stepgroup':
             stepgroups.append(metadata)
+        elif metadata['type'] == 'step':
+            steps.append(metadata)
+        else:
+            others.append(metadata)
     
     # Sort each group by name
     pipelines.sort(key=lambda x: x['name'])
     stages.sort(key=lambda x: x['name'])
     stepgroups.sort(key=lambda x: x['name'])
+    steps.sort(key=lambda x: x['name'])
+    others.sort(key=lambda x: x['name'])
     
     # Combine sorted groups
-    sorted_metadata = pipelines + stages + stepgroups
+    sorted_metadata = pipelines + stages + stepgroups + steps + others
     
     for metadata in sorted_metadata:
         description = metadata['description'][:100] + "..." if len(metadata['description']) > 100 else metadata['description']
@@ -274,7 +394,7 @@ def generate_index_html(templates_metadata):
         safe_name = re.sub(r'[^a-zA-Z0-9_\-]', '_', metadata['name'])
         
         # Choose icon based on type
-        icon = 'sitemap' if metadata['type'] == 'pipeline' else 'cube' if metadata['type'] == 'stage' else 'cubes'
+        icon = 'sitemap' if metadata['type'] == 'pipeline' else 'cube' if metadata['type'] == 'stage' else 'cubes' if metadata['type'] == 'stepgroup' else 'cog'
         
         html += f"""
                 <div class="template-card" data-type="{metadata['type']}">
@@ -286,8 +406,11 @@ def generate_index_html(templates_metadata):
                     <div class="template-tags">
         """
         
-        for tag in metadata.get('tags', [])[:3]:
-            html += f'<span class="tag"><i class="fas fa-tag"></i> {tag}</span>'
+        # Get tags safely and limit to 3
+        tags = metadata.get('tags', [])
+        if tags and isinstance(tags, list):
+            for tag in tags[:3]:
+                html += f'<span class="tag"><i class="fas fa-tag"></i> {tag}</span>'
         
         html += f"""
                     </div>

@@ -115,6 +115,8 @@ def validate_template(template_data):
                 elif template_obj['type'] == "Pipeline":
                     schema_type = "pipeline"
                 elif template_obj['type'] == "StepGroup":
+                    schema_type = "stepgroup"
+                elif template_obj['type'] == "Step":
                     schema_type = "step"
             
             # Get the appropriate schema
@@ -144,7 +146,7 @@ def validate_template(template_data):
             if field not in template_data:
                 return False, f"Missing required field: {field}"
         
-        valid_types = ['pipeline', 'stage', 'stepgroup']
+        valid_types = ['pipeline', 'stage', 'stepgroup', 'step']
         if template_data.get('type') not in valid_types:
             return False, f"Invalid template type: {template_data.get('type')}. Must be one of {valid_types}"
         
@@ -211,13 +213,33 @@ def process_harness_template(template_path, output_dir='docs/templates', output_
         return None
 
 def process_all_templates(templates_dir, output_dir='docs/templates', output_format='html', validate_only=False):
-    """Process all template files in the given directory."""
+    """Process template files from a directory or a single file."""
     start_time = datetime.now()
     logger.info(f"Starting template processing from {templates_dir}")
     
-    # Find all template files
-    template_files = glob.glob(os.path.join(templates_dir, '**/*.yaml'), recursive=True)
-    template_files.extend(glob.glob(os.path.join(templates_dir, '**/*.yml'), recursive=True))
+    # Create the main output directory
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Create subdirectories for all supported template types upfront
+    template_types = ['pipeline', 'stage', 'stepgroup', 'step']
+    for template_type in template_types:
+        type_dir = os.path.join(output_dir, template_type)
+        os.makedirs(type_dir, exist_ok=True)
+        logger.debug(f"Created directory: {type_dir}")
+    
+    # Handle single file vs directory
+    template_files = []
+    if os.path.isfile(templates_dir):
+        # It's a single file
+        if templates_dir.endswith('.yaml') or templates_dir.endswith('.yml'):
+            template_files = [templates_dir]
+            logger.debug(f"Processing single template file: {templates_dir}")
+        else:
+            logger.warning(f"Specified file is not a YAML file: {templates_dir}")
+    else:
+        # It's a directory - find all template files
+        template_files = glob.glob(os.path.join(templates_dir, '**/*.yaml'), recursive=True)
+        template_files.extend(glob.glob(os.path.join(templates_dir, '**/*.yml'), recursive=True))
     
     if not template_files:
         logger.warning(f"No template files found in {templates_dir}")
@@ -245,9 +267,6 @@ def process_all_templates(templates_dir, output_dir='docs/templates', output_for
     
     # Generate index page if not in validate-only mode
     if not validate_only and all_metadata and output_format == 'html':
-        # Create output directory if it doesn't exist
-        os.makedirs(output_dir, exist_ok=True)
-        
         index_html = generate_index_html(all_metadata)
         with open(os.path.join(output_dir, 'index.html'), 'w') as file:
             file.write(index_html)
@@ -294,6 +313,7 @@ def generate_css(output_dir):
         --pipeline-color: #42a5f5;
         --stage-color: #66bb6a;
         --stepgroup-color: #ffa726;
+        --step-color: #ec407a;
         --gradient: linear-gradient(135deg, var(--primary-color), var(--accent-color));
     }
 
@@ -624,6 +644,15 @@ def generate_css(output_dir):
     
     .type-stepgroup::before {
         content: "\\f0ae";
+    }
+    
+    .type-step {
+        background-color: rgba(236, 64, 122, 0.15);
+        color: var(--step-color);
+    }
+    
+    .type-step::before {
+        content: "\\f013";
     }
 
     /* Template Count */
@@ -986,6 +1015,8 @@ def extract_template_metadata(template_data, schema=None):
                 elif template_obj['type'] == "Pipeline":
                     schema_type = "pipeline"
                 elif template_obj['type'] == "StepGroup":
+                    schema_type = "stepgroup"
+                elif template_obj['type'] == "Step":
                     schema_type = "step"
             schema = get_harness_schema(schema_type)
 
@@ -999,11 +1030,15 @@ def extract_template_metadata(template_data, schema=None):
             'tags': [],
             'author': 'Harness',
             'version': '1.0.0',
-            'examples': []
+            'examples': [],
+            'raw_template': template_data
         }
 
         # Extract template object (handle both formats)
         template_obj = template_data.get('template', template_data)
+        
+        if 'versionLabel' in template_obj:
+            metadata['version'] = str(template_obj['versionLabel'])
         
         # Use jsonschema to validate and extract data
         try:
@@ -1017,7 +1052,6 @@ def extract_template_metadata(template_data, schema=None):
             for field, field_schema in properties.items():
                 if field in template_obj:
                     value = template_obj[field]
-                    field_type = field_schema.get('type', 'string')
                     
                     # Map schema fields to metadata
                     if field == 'name':
@@ -1026,10 +1060,13 @@ def extract_template_metadata(template_data, schema=None):
                         metadata['type'] = value.lower()
                     elif field == 'description':
                         metadata['description'] = value
-                    elif field == 'version':
-                        metadata['version'] = str(value)
+                    elif field == 'author':
+                        metadata['author'] = value
                     elif field == 'tags':
                         metadata['tags'] = value if isinstance(value, list) else []
+                    elif field == 'examples':
+                        if isinstance(value, list):
+                            metadata['examples'] = value
                     elif field == 'spec':
                         # Extract spec metadata using the spec schema
                         spec_schema = field_schema
@@ -1043,8 +1080,16 @@ def extract_template_metadata(template_data, schema=None):
             metadata['name'] = template_obj.get('name', 'Unnamed Template')
             metadata['type'] = template_obj.get('type', 'unknown').lower()
             metadata['description'] = template_obj.get('description', '')
-            metadata['version'] = str(template_obj.get('version', '1.0.0'))
+            
+            if 'versionLabel' in template_obj:
+                metadata['version'] = str(template_obj['versionLabel'])
+                
+            metadata['author'] = template_obj.get('author', 'Harness')
             metadata['tags'] = template_obj.get('tags', [])
+            
+            # Extract examples if available
+            if 'examples' in template_obj and isinstance(template_obj['examples'], list):
+                metadata['examples'] = template_obj['examples']
 
         return metadata
 

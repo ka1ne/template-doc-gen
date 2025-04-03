@@ -25,6 +25,13 @@ source .env || { echo "Error loading .env file"; exit 1; }
 
 # Ensure output directory exists with proper permissions
 mkdir -p "$OUTPUT_DIR" || { echo "Error creating output directory"; exit 1; }
+
+# Clean up existing content in the output directory
+echo "Cleaning up existing documentation in $OUTPUT_DIR..."
+rm -rf "$OUTPUT_DIR"/* || { echo "Warning: Could not clean up output directory"; }
+
+# Recreate the directory with proper permissions
+mkdir -p "$OUTPUT_DIR" || { echo "Error creating output directory"; exit 1; }
 chmod 777 "$OUTPUT_DIR" || { echo "Error setting directory permissions"; exit 1; }
 
 # Get absolute paths for volume mounts

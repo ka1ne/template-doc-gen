@@ -65,5 +65,7 @@ coverage.xml
 .python-version 
 
 # Generated documentation
-docs/output/
-docs/templates/ 
+docs/*
+
+# Local configuration
+.env.local 
