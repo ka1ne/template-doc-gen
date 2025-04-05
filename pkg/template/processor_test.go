@@ -119,7 +119,7 @@ func TestValidateTemplate(t *testing.T) {
 func TestExtractMetadata(t *testing.T) {
 	processor := NewProcessor(nil)
 
-	// // test extraction of a complete template
+	//  test extraction of a complete template
 	template := map[string]interface{}{
 		"template": map[string]interface{}{
 			"name":         "Complete Template",
@@ -160,7 +160,7 @@ func TestExtractMetadata(t *testing.T) {
 		t.Fatalf("ExtractMetadata failed: %v", err)
 	}
 
-	// // verify extracted fields
+	//  verify extracted fields
 	if metadata.Name != "Complete Template" {
 		t.Errorf("Expected Name='Complete Template', got '%s'", metadata.Name)
 	}
@@ -180,7 +180,7 @@ func TestExtractMetadata(t *testing.T) {
 		t.Errorf("Tags not extracted correctly: %v", metadata.Tags)
 	}
 
-	// // verify variables
+	//  verify variables
 	if len(metadata.Variables) != 1 {
 		t.Errorf("Expected 1 variable, got %d", len(metadata.Variables))
 	}
@@ -202,7 +202,7 @@ func TestExtractMetadata(t *testing.T) {
 		}
 	}
 
-	// // verify parameters
+	//  verify parameters
 	if len(metadata.Parameters) != 1 {
 		t.Errorf("Expected 1 parameter, got %d", len(metadata.Parameters))
 	}
@@ -227,12 +227,12 @@ func TestExtractMetadata(t *testing.T) {
 		}
 	}
 
-	// // verify examples
+	//  verify examples
 	if len(metadata.Examples) != 2 || metadata.Examples[0] != "Example 1" || metadata.Examples[1] != "Example 2" {
 		t.Errorf("Examples not extracted correctly: %v", metadata.Examples)
 	}
 
-	// // test extraction with missing template field
+	//  test extraction with missing template field
 	badTemplate := map[string]interface{}{
 		"name": "Bad Template",
 	}
@@ -241,7 +241,7 @@ func TestExtractMetadata(t *testing.T) {
 		t.Error("Expected error for template with missing template field")
 	}
 
-	// // test extraction with numeric version label
+	//  test extraction with numeric version label
 	numericVersionTemplate := map[string]interface{}{
 		"template": map[string]interface{}{
 			"name":         "Numeric Version Template",
@@ -257,7 +257,7 @@ func TestExtractMetadata(t *testing.T) {
 		t.Errorf("Expected Version='1.0', got '%s'", metadata.Version)
 	}
 
-	// // test extraction with empty map tags
+	//  test extraction with empty map tags
 	emptyTagsTemplate := map[string]interface{}{
 		"template": map[string]interface{}{
 			"name": "Empty Tags Template",
@@ -277,20 +277,20 @@ func TestExtractMetadata(t *testing.T) {
 func TestProcessTemplate(t *testing.T) {
 	processor := NewProcessor(nil)
 
-	// // create temporary directory for test files
+	//  create temporary directory for test files
 	tempDir, err := os.MkdirTemp("", "template_test")
 	if err != nil {
 		t.Fatalf("Failed to create temp directory: %v", err)
 	}
 	defer os.RemoveAll(tempDir)
 
-	// // create output directory
+	//  create output directory
 	outputDir := filepath.Join(tempDir, "output")
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		t.Fatalf("Failed to create output directory: %v", err)
 	}
 
-	// // create a valid test template
+	//  create a valid test template
 	validTemplateContent := `
 template:
   name: Valid Test Template
@@ -317,7 +317,7 @@ template:
 `
 	validTemplatePath := createTestTemplateFile(t, tempDir, validTemplateContent)
 
-	// // create an invalid test template
+	//  create an invalid test template
 	invalidTemplateContent := `
 template:
   name: Invalid Test Template
@@ -329,7 +329,7 @@ template:
 		t.Fatalf("Failed to write invalid template file: %v", err)
 	}
 
-	// // create a malformed YAML template
+	//  create a malformed YAML template
 	malformedTemplateContent := `
 template:
   name: Malformed YAML
@@ -341,7 +341,7 @@ template:
 		t.Fatalf("Failed to write malformed template file: %v", err)
 	}
 
-	// // test processing valid template with validate only
+	//  test processing valid template with validate only
 	metadata, err := processor.ProcessTemplate(validTemplatePath, outputDir, "html", true)
 	if err != nil {
 		t.Errorf("Expected no error processing valid template (validate only), got: %v", err)
@@ -353,7 +353,7 @@ template:
 		t.Errorf("Expected Name='Valid Test Template', got '%s'", metadata.Name)
 	}
 
-	// // test processing invalid template
+	//  test processing invalid template
 	metadata, err = processor.ProcessTemplate(invalidTemplatePath, outputDir, "html", false)
 	if err == nil {
 		t.Error("Expected error processing invalid template, got nil")
@@ -362,7 +362,7 @@ template:
 		t.Errorf("Expected nil metadata for invalid template, got: %v", metadata)
 	}
 
-	// // test processing malformed YAML template
+	//  test processing malformed YAML template
 	metadata, err = processor.ProcessTemplate(malformedTemplatePath, outputDir, "html", false)
 	if err == nil {
 		t.Error("Expected error processing malformed YAML template, got nil")
@@ -373,7 +373,7 @@ template:
 }
 
 func TestHelperFunctions(t *testing.T) {
-	// // test getStringValue
+	//  test getStringValue
 	stringMap := map[string]interface{}{
 		"key1": "value1",
 		"key2": 123,
@@ -390,7 +390,7 @@ func TestHelperFunctions(t *testing.T) {
 		t.Errorf("Expected getStringValue to return 'default', got '%s'", val)
 	}
 
-	// // test getBoolValue
+	//  test getBoolValue
 	boolMap := map[string]interface{}{
 		"key1": true,
 		"key2": false,
@@ -415,14 +415,14 @@ func TestHelperFunctions(t *testing.T) {
 func TestProcessAllTemplates(t *testing.T) {
 	processor := NewProcessor(nil)
 
-	// // create temporary directory structure
+	//  create temporary directory structure
 	tempDir, err := os.MkdirTemp("", "all_templates_test")
 	if err != nil {
 		t.Fatalf("Failed to create temp directory: %v", err)
 	}
 	defer os.RemoveAll(tempDir)
 
-	// // create subdirectories for different template types
+	//  create subdirectories for different template types
 	pipelineDir := filepath.Join(tempDir, "pipeline")
 	stageDir := filepath.Join(tempDir, "stage")
 	if err := os.MkdirAll(pipelineDir, 0755); err != nil {
@@ -432,10 +432,10 @@ func TestProcessAllTemplates(t *testing.T) {
 		t.Fatalf("Failed to create stage directory: %v", err)
 	}
 
-	// // create output directory
+	//  create output directory
 	outputDir := filepath.Join(tempDir, "output")
 
-	// // create test templates
+	//  create test templates
 	pipeline1Content := `
 template:
   name: Pipeline 1
@@ -469,7 +469,7 @@ template:
 		t.Fatalf("Failed to write stage file: %v", err)
 	}
 
-	// // create an invalid template to test error handling
+	//  create an invalid template to test error handling
 	invalidContent := `
 template:
   name: Invalid
@@ -480,30 +480,30 @@ template:
 		t.Fatalf("Failed to write invalid file: %v", err)
 	}
 
-	// // test processing all templates (validate only)
+	//  test processing all templates (validate only)
 	metadataList, err := processor.ProcessAllTemplates(tempDir, outputDir, "html", true)
 	if err != nil {
 		t.Fatalf("Failed to process all templates: %v", err)
 	}
 
-	// // we should have 3 valid templates (pipeline1, pipeline2, stage1)
-	// // the invalid.yaml should be skipped with an error
+	//  we should have 3 valid templates (pipeline1, pipeline2, stage1)
+	//  the invalid.yaml should be skipped with an error
 	if len(metadataList) != 3 {
 		t.Errorf("Expected 3 valid templates, got %d", len(metadataList))
 	}
 
-	// // check if output directories are created in non-validate mode
+	//  check if output directories are created in non-validate mode
 	metadataList, err = processor.ProcessAllTemplates(tempDir, outputDir, "json", false)
 	if err != nil {
 		t.Fatalf("Failed to process all templates in JSON mode: %v", err)
 	}
 
-	// // check if output directory was created
+	//  check if output directory was created
 	if _, err := os.Stat(outputDir); os.IsNotExist(err) {
 		t.Error("Output directory was not created")
 	}
 
-	// // check if type subdirectories were created
+	//  check if type subdirectories were created
 	pipelineOutputDir := filepath.Join(outputDir, "pipeline")
 	stageOutputDir := filepath.Join(outputDir, "stage")
 	if _, err := os.Stat(pipelineOutputDir); os.IsNotExist(err) {
@@ -513,7 +513,7 @@ template:
 		t.Error("Stage output directory was not created")
 	}
 
-	// // test with a single file
+	//  test with a single file
 	singleFileMetadata, err := processor.ProcessAllTemplates(pipeline1Path, outputDir, "html", true)
 	if err != nil {
 		t.Fatalf("Failed to process single template file: %v", err)
@@ -522,13 +522,13 @@ template:
 		t.Errorf("Expected 1 metadata for single file, got %d", len(singleFileMetadata))
 	}
 
-	// // test with non-existent path
+	//  test with non-existent path
 	_, err = processor.ProcessAllTemplates("/path/does/not/exist", outputDir, "html", true)
 	if err == nil {
 		t.Error("Expected error for non-existent path, got nil")
 	}
 
-	// // test with non-YAML file
+	//  test with non-YAML file
 	nonYamlPath := filepath.Join(tempDir, "not-yaml.txt")
 	if err := os.WriteFile(nonYamlPath, []byte("This is not YAML"), 0644); err != nil {
 		t.Fatalf("Failed to write non-YAML file: %v", err)
@@ -539,21 +539,21 @@ template:
 	}
 }
 
-// // testConcurrentProcessing tests that concurrent template processing works correctly
+// testConcurrentProcessing tests that concurrent template processing works correctly
 func TestConcurrentProcessing(t *testing.T) {
-	// // create a test processor
+	//  create a test processor
 	logger := logrus.New()
-	logger.SetOutput(io.Discard) // // silence logging for tests
+	logger.SetOutput(io.Discard) //  silence logging for tests
 	processor := NewProcessor(logger)
 
-	// // create a temporary directory for templates
+	//  create a temporary directory for templates
 	tempDir, err := os.MkdirTemp("", "concurrent_test")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tempDir)
 
-	// // create multiple test templates
+	//  create multiple test templates
 	numTemplates := 10
 	for i := 0; i < numTemplates; i++ {
 		templateContent := fmt.Sprintf(`template:
@@ -569,12 +569,12 @@ func TestConcurrentProcessing(t *testing.T) {
 		}
 	}
 
-	// // process templates concurrently
+	//  process templates concurrently
 	start := time.Now()
 	results, err := processor.ProcessAllTemplates(tempDir, "/tmp/output", "json", true)
 	duration := time.Since(start)
 
-	// // verify results
+	//  verify results
 	if err != nil {
 		t.Fatalf("ProcessAllTemplates failed: %v", err)
 	}
@@ -582,7 +582,7 @@ func TestConcurrentProcessing(t *testing.T) {
 		t.Errorf("Expected %d results, got %d", numTemplates, len(results))
 	}
 
-	// // ensure all templates have unique names
+	//  ensure all templates have unique names
 	names := make(map[string]bool)
 	for _, result := range results {
 		if _, exists := names[result.Name]; exists {
@@ -594,23 +594,23 @@ func TestConcurrentProcessing(t *testing.T) {
 	t.Logf("Processed %d templates in %v", numTemplates, duration)
 }
 
-// // testSchemaValidation tests that schema validation works correctly
+// testSchemaValidation tests that schema validation works correctly
 func TestSchemaValidation(t *testing.T) {
-	// // skip detailed schema validation tests in CI environments
+	//  skip detailed schema validation tests in CI environments
 	if os.Getenv("CI") == "true" {
 		t.Skip("Skipping schema validation tests in CI environment")
 	}
 
-	// // create a test processor with schema manager
+	//  create a test processor with schema manager
 	logger := logrus.New()
-	logger.SetOutput(io.Discard) // // silence logging for tests
+	logger.SetOutput(io.Discard) //  silence logging for tests
 	processor := NewProcessor(logger)
 
-	// // create a real schema manager - will actually use the Harness schema repo
+	//  create a real schema manager - will actually use the Harness schema repo
 	schemaManager := schema.NewSchemaManager(logger)
 	processor.SetSchemaManager(schemaManager)
 
-	// // test cases - only test basic functionality, not detailed schema validation
+	//  test cases - only test basic functionality, not detailed schema validation
 	tests := []struct {
 		name       string
 		template   map[string]interface{}

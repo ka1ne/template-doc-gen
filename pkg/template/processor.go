@@ -69,8 +69,8 @@ func (p *Processor) ProcessTemplate(templatePath string, outputDir string, outpu
 		return metadata, nil
 	}
 
-	// // generate documentation if needed (handled by separate Python service)
-	// // store metadata for later processing
+	//  generate documentation if needed (handled by separate Python service)
+	//  store metadata for later processing
 
 	return metadata, nil
 }
@@ -187,7 +187,7 @@ func (p *Processor) ProcessAllTemplates(templatesDir string, outputDir string, o
 	p.logger.Infof("Processing completed in %.2f seconds", duration)
 	p.logger.Infof("Templates processed: %d successful, %d failed", validCount, errorCount)
 
-	// // note: Index generation and CSS generation would be handled by the Python service
+	//  note: Index generation and CSS generation would be handled by the Python service
 
 	return allMetadata, nil
 }

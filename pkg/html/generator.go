@@ -319,29 +319,29 @@ const templateDetailsTemplate = `
                 <div class="content-area">
                     <div class="metadata-section" id="metadata">
                         <h2>Template Metadata</h2>
-                        <table>
+                        <table class="metadata-table">
                             <tr>
-                                <th>Identifier:</th>
-                                <td>{{.Identifier}}</td>
+                                <th class="metadata-label">Identifier:</th>
+                                <td class="metadata-value">{{.Identifier}}</td>
                             </tr>
                             <tr>
-                                <th>Version:</th>
-                                <td>{{.Version}}</td>
+                                <th class="metadata-label">Version:</th>
+                                <td class="metadata-value">{{.Version}}</td>
                             </tr>
                             <tr>
-                                <th>Type:</th>
-                                <td>{{.Type}}</td>
+                                <th class="metadata-label">Type:</th>
+                                <td class="metadata-value">{{.Type}}</td>
                             </tr>
                             {{if .Description}}
                             <tr>
-                                <th>Description:</th>
-                                <td>{{.Description}}</td>
+                                <th class="metadata-label">Description:</th>
+                                <td class="metadata-value">{{.Description}}</td>
                             </tr>
                             {{end}}
                             {{if .Author}}
                             <tr>
-                                <th>Author:</th>
-                                <td>{{.Author}}</td>
+                                <th class="metadata-label">Author:</th>
+                                <td class="metadata-value">{{.Author}}</td>
                             </tr>
                             {{end}}
                         </table>
@@ -365,16 +365,22 @@ const templateDetailsTemplate = `
                             <tr>
                                 <th>Name</th>
                                 <th>Type</th>
-                                <th>Required</th>
+                                <th class="required-col">Required</th>
                                 <th>Default</th>
                                 <th>Description</th>
                             </tr>
                             {{range $name, $param := .Parameters}}
                             <tr>
-                                <td>{{$name}}</td>
+                                <td class="name-cell">
+                                    <span class="field-name">{{$name}}</span>
+                                </td>
                                 <td>{{$param.Type}}</td>
-                                <td class="{{if $param.Required}}required{{else}}optional{{end}}">
-                                    {{if $param.Required}}Yes{{else}}No{{end}}
+                                <td class="required-col">
+                                    {{if $param.Required}}
+                                    <span class="required-badge">Yes</span>
+                                    {{else}}
+                                    <span class="optional-text">No</span>
+                                    {{end}}
                                 </td>
                                 <td>{{if $param.Default}}{{$param.Default}}{{end}}</td>
                                 <td>{{$param.Description}}</td>
@@ -391,16 +397,22 @@ const templateDetailsTemplate = `
                             <tr>
                                 <th>Name</th>
                                 <th>Type</th>
-                                <th>Required</th>
+                                <th class="required-col">Required</th>
                                 <th>Scope</th>
                                 <th>Description</th>
                             </tr>
                             {{range $name, $var := .Variables}}
                             <tr>
-                                <td>{{$name}}</td>
+                                <td class="name-cell">
+                                    <span class="field-name">{{$name}}</span>
+                                </td>
                                 <td>{{$var.Type}}</td>
-                                <td class="{{if $var.Required}}required{{else}}optional{{end}}">
-                                    {{if $var.Required}}Yes{{else}}No{{end}}
+                                <td class="required-col">
+                                    {{if $var.Required}}
+                                    <span class="required-badge">Yes</span>
+                                    {{else}}
+                                    <span class="optional-text">No</span>
+                                    {{end}}
                                 </td>
                                 <td>{{$var.Scope}}</td>
                                 <td>{{$var.Description}}</td>
@@ -830,34 +842,132 @@ code {
     padding-bottom: 3px;
 }
 
+.metadata-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 15px 0;
+    border: 1px solid var(--card-border);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.metadata-table tr:hover {
+    background-color: rgba(0,0,0,0.02);
+}
+
+.metadata-table tr {
+    border-bottom: 1px solid var(--card-border);
+}
+
+.metadata-table tr:last-child {
+    border-bottom: none;
+}
+
+.metadata-label {
+    width: 150px;
+    min-width: 150px;
+    max-width: 200px;
+    text-align: left;
+    padding: 12px;
+    font-weight: 600;
+    background-color: var(--light-bg);
+    vertical-align: top;
+}
+
+.metadata-value {
+    padding: 12px;
+    word-break: break-word;
+}
+
 .parameter-table, .variable-table {
     width: 100%;
     border-collapse: collapse;
     margin: 20px 0;
+    border: 1px solid var(--card-border);
+    border-radius: 4px;
+    overflow: hidden;
 }
 
 .parameter-table th, .variable-table th {
     text-align: left;
-    background-color: var(--light-bg);
     padding: 12px;
+    background-color: var(--light-bg);
+    font-weight: 600;
+}
+
+.parameter-table th:first-child, .variable-table th:first-child {
+    width: 150px;
+    min-width: 150px;
+}
+
+.parameter-table th:nth-child(2), .variable-table th:nth-child(2) {
+    width: 100px;
+    min-width: 100px;
+}
+
+.parameter-table th:last-child, .variable-table th:last-child {
+    width: 40%;
+}
+
+.parameter-table tr:not(:last-child), 
+.variable-table tr:not(:last-child) {
+    border-bottom: 1px solid var(--card-border);
 }
 
 .parameter-table td, .variable-table td {
+    vertical-align: middle;
     padding: 12px;
-    border-bottom: 1px solid var(--card-border);
+    word-break: break-word;
 }
 
 .parameter-table tr:hover, .variable-table tr:hover {
     background-color: rgba(0,0,0,0.02);
 }
 
-.required {
-    color: crimson;
-    font-weight: bold;
+.name-cell {
+    vertical-align: middle;
+    padding: 12px;
+    text-align: left;
+    width: 150px;
+    min-width: 150px;
+    max-width: 200px;
+    position: relative;
 }
 
-.optional {
-    color: green;
+.field-name {
+    font-weight: 500;
+    display: inline-block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+.required-col {
+    width: 100px;
+    text-align: center;
+    vertical-align: middle;
+}
+
+.required-badge {
+    display: inline-block;
+    background-color: #e8f5e9;
+    color: #2e7d32;
+    font-size: 0.85em;
+    padding: 3px 10px;
+    border-radius: 3px;
+    border: 1px solid #c8e6c9;
+    font-weight: 600;
+    min-width: 40px;
+    text-align: center;
+}
+
+.optional-text {
+    display: inline-block;
+    color: #757575;
+    font-size: 0.85em;
+    min-width: 40px;
+    text-align: center;
 }
 
 footer {
@@ -891,9 +1001,32 @@ footer {
         padding: 15px;
     }
     
-    .parameter-table, .variable-table {
+    .metadata-table,
+    .parameter-table, 
+    .variable-table {
         display: block;
         overflow-x: auto;
+        white-space: nowrap;
+        border: 1px solid var(--card-border);
+        border-radius: 4px;
+    }
+    
+    .metadata-table th,
+    .parameter-table th, 
+    .variable-table th,
+    .metadata-table td,
+    .parameter-table td, 
+    .variable-table td {
+        white-space: normal;
+    }
+    
+    .metadata-label,
+    .name-cell {
+        position: sticky;
+        left: 0;
+        background-color: var(--light-bg);
+        z-index: 1;
+        border-right: 1px solid var(--card-border);
     }
     
     footer {
