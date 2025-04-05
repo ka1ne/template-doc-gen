@@ -49,8 +49,17 @@ func runServe(ctx context.Context) error {
 	if !serveNoGen {
 		cfg.Logger.Info("Generating documentation before serving...")
 
-		// Create a new generate command and execute it with current context
+		// Set up the generate command with proper flags
 		generateCmd := newGenerateCommand()
+
+		// We need to configure the generate command to use our output directory
+		// but we can't pass the -d flag directly because generate uses different flags
+		generateCmd.SetArgs([]string{
+			"--output", cfg.OutputDir,
+			"--format", cfg.OutputFormat,
+			"--source", cfg.SourceDir,
+		})
+
 		err := generateCmd.ExecuteContext(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to generate documentation: %w", err)

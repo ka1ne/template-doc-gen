@@ -148,10 +148,10 @@ build-fileserver: dirs
 
 # serve docs locally
 .PHONY: serve
-serve: build build-fileserver
+serve: build build-fileserver generate
 	@echo "Starting local server to preview documentation..."
 	@echo "Open your browser and navigate to http://localhost:8000/"
-	./$(BUILD_DIR)/$(BINARY_NAME) serve --dir=$(OUTPUT_DIR) --port=8000
+	./$(BUILD_DIR)/$(BINARY_NAME) serve -d $(OUTPUT_DIR) -p 8000 --no-generate
 
 # build dev image
 .PHONY: docker-build-dev
