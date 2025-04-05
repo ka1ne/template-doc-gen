@@ -1,0 +1,35 @@
+# Development image
+FROM golang:1.20-alpine
+
+WORKDIR /app
+
+RUN apk add --no-cache git make
+
+COPY go.mod go.sum* ./
+RUN go mod download
+
+COPY . .
+
+ARG VERSION=dev
+ARG COMMIT=unknown
+ARG BUILD_DATE=unknown
+RUN go build \
+    -ldflags="-X github.com/ka1ne/template-doc-gen/internal/version.Version=${VERSION} \
+    -X github.com/ka1ne/template-doc-gen/internal/version.Commit=${COMMIT} \
+    -X github.com/ka1ne/template-doc-gen/internal/version.BuildDate=${BUILD_DATE} \
+    -X github.com/ka1ne/template-doc-gen/internal/version.GoVersion=$(go version | cut -d ' ' -f 3)" \
+    -o /app/bin/tempdocs cmd/tempdocs/main.go && \
+    go build -o /app/bin/fileserver cmd/fileserver/main.go
+
+ENV SOURCE_DIR=/app/templates \
+    OUTPUT_DIR=/app/docs/output \
+    FORMAT=html \
+    VERBOSE=true \
+    VALIDATE_ONLY=false \
+    PATH="/app/bin:${PATH}"
+
+RUN mkdir -p /app/docs/output && chmod 777 /app/docs/output
+
+EXPOSE 8000
+
+CMD ["sh", "-c", "tempdocs --source ${SOURCE_DIR} --output ${OUTPUT_DIR} --format ${FORMAT} --verbose && fileserver -dir ${OUTPUT_DIR}"] 

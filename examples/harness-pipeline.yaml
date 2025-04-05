@@ -1,0 +1,193 @@
+pipeline:
+  name: Template Documentation Generator Pipeline
+  identifier: template_docs_pipeline
+  projectIdentifier: default
+  orgIdentifier: default
+  tags:
+    category: documentation
+  stages:
+    - stage:
+        name: Generate Documentation
+        identifier: generate_documentation
+        description: Generate documentation from Harness templates with efficient caching
+        spec:
+          cloneCodebase: true
+          execution:
+            steps:
+              - step:
+                  name: Prepare Environment
+                  identifier: prepare_environment
+                  type: Run
+                  spec:
+                    connectorRef: account.harnessImage
+                    image: alpine:latest
+                    shell: Bash
+                    command: |
+                      # Create necessary directories
+                      mkdir -p "${CACHE_DIR}/templates"
+                      mkdir -p "${CACHE_DIR}/docs-output"
+                      
+                      # Create cache marker directory for template hashing
+                      mkdir -p "${CACHE_DIR}/markers"
+                      
+                      # Copy templates to cache directory
+                      echo "Copying templates to cache directory..."
+                      cp -r <+codebase.path>/templates/* "${CACHE_DIR}/templates/"
+                      
+                      # Generate a hash of all templates for cache invalidation
+                      TEMPLATE_HASH=$(find "${CACHE_DIR}/templates" -type f -exec md5sum {} \; | sort | md5sum | cut -d ' ' -f 1)
+                      echo "Template hash: ${TEMPLATE_HASH}"
+                      
+                      # Store hash for later steps
+                      echo "${TEMPLATE_HASH}" > "${CACHE_DIR}/markers/template-hash.txt"
+                      
+                      # Log template files
+                      echo "Templates prepared for documentation generation:"
+                      find "${CACHE_DIR}/templates" -type f -name "*.yaml" | sort
+
+              - step:
+                  name: Check Cache Status
+                  identifier: check_cache
+                  type: Run
+                  spec:
+                    connectorRef: account.harnessImage
+                    image: alpine:latest
+                    shell: Bash
+                    command: |
+                      # Load template hash from previous step
+                      TEMPLATE_HASH=$(cat "${CACHE_DIR}/markers/template-hash.txt")
+                      
+                      # Check if cached documentation exists and is valid
+                      if [ -f "${CACHE_DIR}/markers/generated-hash.txt" ]; then
+                        CACHED_HASH=$(cat "${CACHE_DIR}/markers/generated-hash.txt")
+                        
+                        if [ "${TEMPLATE_HASH}" = "${CACHED_HASH}" ]; then
+                          echo "Cache is valid: Templates haven't changed since last generation"
+                          echo "true" > "${CACHE_DIR}/markers/cache-valid.txt"
+                        else
+                          echo "Cache invalid: Templates have changed since last generation"
+                          echo "false" > "${CACHE_DIR}/markers/cache-valid.txt"
+                        fi
+                      else
+                        echo "No existing cache found, documentation will be generated"
+                        echo "false" > "${CACHE_DIR}/markers/cache-valid.txt"
+                      fi
+
+              - step:
+                  name: Generate Documentation
+                  identifier: generate_docs
+                  type: Plugin
+                  spec:
+                    connectorRef: account.harnessImage
+                    image: ka1ne/template-doc-gen:pipeline
+                    shell: Bash
+                    command: |
+                      # Check if we can use cache
+                      CACHE_VALID=$(cat "${CACHE_DIR}/markers/cache-valid.txt")
+                      TEMPLATE_HASH=$(cat "${CACHE_DIR}/markers/template-hash.txt")
+                      
+                      if [ "${CACHE_VALID}" = "true" ] && [ "${FORCE_REGEN}" != "true" ]; then
+                        echo "Using cached documentation (templates unchanged)"
+                        echo "To force regeneration, set FORCE_REGEN=true"
+                        exit 0
+                      fi
+                      
+                      echo "Generating documentation..."
+                      
+                      # Generate documentation with our tool
+                      tempdocs generate \
+                        --source "${CACHE_DIR}/templates" \
+                        --output "${CACHE_DIR}/docs-output" \
+                        --format "html" \
+                        --concurrency 4 \
+                        --verbose
+                      
+                      # Store the template hash with the generated documentation for cache validation
+                      echo "${TEMPLATE_HASH}" > "${CACHE_DIR}/markers/generated-hash.txt"
+                      
+                      # List generated files
+                      echo "Generated documentation files:"
+                      find "${CACHE_DIR}/docs-output" -type f | sort
+                  caching:
+                    enabled: true
+                    paths:
+                      - ${CACHE_DIR}/docs-output
+                      - ${CACHE_DIR}/markers
+
+              - step:
+                  name: Publish Documentation to Workspace
+                  identifier: publish_docs
+                  type: Run
+                  spec:
+                    connectorRef: account.harnessImage
+                    image: alpine:latest
+                    shell: Bash
+                    command: |
+                      # Copy from cache to workspace directory for the next stage
+                      mkdir -p "${WORKSPACE_DIR}/docs"
+                      cp -r "${CACHE_DIR}/docs-output/"* "${WORKSPACE_DIR}/docs/"
+                      
+                      # Print information about the generated documentation
+                      echo "Documentation published to workspace"
+                      echo "Files available at: ${WORKSPACE_DIR}/docs"
+                      echo "File count: $(find "${WORKSPACE_DIR}/docs" -type f | wc -l)"
+                      echo "Total size: $(du -sh "${WORKSPACE_DIR}/docs" | cut -f1)"
+
+    - stage:
+        name: Deploy Documentation
+        identifier: deploy_documentation
+        description: Deploy the generated documentation
+        spec:
+          execution:
+            steps:
+              - step:
+                  name: Verify Documentation
+                  identifier: verify_docs
+                  type: Run
+                  spec:
+                    connectorRef: account.harnessImage
+                    image: alpine:latest
+                    shell: Bash
+                    command: |
+                      # Verify documentation files from previous stage
+                      echo "Verifying documentation from workspace..."
+                      
+                      if [ ! -d "${WORKSPACE_DIR}/docs" ]; then
+                        echo "Error: Documentation directory not found in workspace"
+                        exit 1
+                      fi
+                      
+                      # Check for key files
+                      if [ ! -f "${WORKSPACE_DIR}/docs/index.html" ]; then
+                        echo "Error: index.html not found in documentation"
+                        exit 1
+                      fi
+                      
+                      echo "Documentation verification passed"
+                      echo "Ready for deployment"
+
+              - step:
+                  name: Deploy to Web Server
+                  identifier: deploy_web
+                  type: Run
+                  spec:
+                    connectorRef: account.harnessImage
+                    image: nginx:alpine
+                    shell: Bash
+                    command: |
+                      # In a real pipeline, this would deploy to your actual web server
+                      # For demonstration, we just copy to nginx html directory
+                      
+                      echo "Deploying documentation to web server..."
+                      cp -r "${WORKSPACE_DIR}/docs/"* /usr/share/nginx/html/
+                      
+                      # Simulate starting the web server
+                      echo "Web server configured with documentation"
+                      echo "Documentation would now be available at http://your-server/docs/"
+
+  variables:
+    - name: FORCE_REGEN
+      type: String
+      description: "Set to 'true' to force documentation regeneration even if cache is valid"
+      required: false
+      value: "false" 

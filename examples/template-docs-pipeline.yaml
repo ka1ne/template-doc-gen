@@ -1,0 +1,462 @@
+pipeline:
+  name: Harness Template Documentation Generator
+  identifier: harness_template_docs
+  projectIdentifier: default
+  orgIdentifier: default
+  tags:
+    category: documentation
+    type: templates
+  
+  # Pipeline Properties
+  properties:
+    ci:
+      codebase:
+        connectorRef: <+input>
+        repoName: <+input>
+        build:
+          type: branch
+          spec:
+            branch: <+input>
+
+  # Triggers for automatic updates
+  triggers:
+    - trigger:
+        name: Git Push Trigger
+        identifier: git_push_trigger
+        enabled: true
+        description: "Automatically generate documentation when templates are updated"
+        tags:
+          category: git
+        pipeline:
+          identifier: harness_template_docs
+          projectIdentifier: default
+          orgIdentifier: default
+        source:
+          type: Webhook
+          spec:
+            type: Github
+            spec:
+              connectorRef: <+input>
+              payloadConditions:
+                - key: eventType
+                  operator: Equals
+                  value: push
+              headerConditions: []
+              repoName: <+input>
+              actions: []
+              branches:
+                - main
+    
+    - trigger:
+        name: Manual Regeneration Trigger
+        identifier: manual_regen_trigger
+        enabled: true
+        description: "Manually trigger documentation regeneration with force option"
+        tags:
+          category: manual
+        pipeline:
+          identifier: harness_template_docs
+          projectIdentifier: default
+          orgIdentifier: default
+        source:
+          type: Webhook
+          spec:
+            type: Manual
+            spec:
+              inputs:
+                - name: FORCE_REGEN
+                  type: String
+                  value: "true"
+                  description: "Force regeneration of documentation even if templates haven't changed"
+                  required: false
+
+    - trigger:
+        name: Weekly Regeneration
+        identifier: weekly_regen_trigger
+        enabled: true
+        description: "Weekly regeneration of documentation to ensure it's up-to-date"
+        tags:
+          category: scheduled
+        pipeline:
+          identifier: harness_template_docs
+          projectIdentifier: default
+          orgIdentifier: default
+          variables:
+            - name: FORCE_REGEN
+              value: "true"
+        source:
+          type: Scheduled
+          spec:
+            type: Cron
+            spec:
+              expression: "0 0 * * 0"  # Every Sunday at midnight
+              timezone: "UTC"
+
+  # Pipeline Variables
+  variables:
+    - name: DOCS_TARGET_DIR
+      type: String
+      description: "Target directory for publishing documentation"
+      required: false
+      value: "docs/generated"
+    - name: FORCE_REGEN
+      type: String
+      description: "Set to 'true' to force documentation regeneration even if cache is valid"
+      required: false
+      value: "false"
+    - name: DEPLOYMENT_TYPE 
+      type: String
+      description: "Type of deployment to use (git, artifact, or none)"
+      required: false
+      value: "none"
+
+  # Pipeline Stages
+  stages:
+    - stage:
+        name: Generate Documentation
+        identifier: generate_documentation
+        description: Generate documentation from Harness templates with efficient caching
+        spec:
+          cloneCodebase: true
+          infrastructure:
+            type: KubernetesDirect
+            spec:
+              connectorRef: <+input>
+              namespace: harness-docs
+              resources:
+                limits:
+                  cpu: 1
+                  memory: 2Gi
+                requests:
+                  cpu: 0.5
+                  memory: 1Gi
+              automountServiceAccountToken: true
+              nodeSelector: {}
+              os: Linux
+          execution:
+            steps:
+              # Step 1: Validate environment and setup
+              - step:
+                  name: Validate Environment
+                  identifier: validate_environment
+                  type: Run
+                  spec:
+                    connectorRef: account.harnessImage
+                    image: alpine:latest
+                    shell: Bash
+                    command: |
+                      # Validate template directory exists
+                      if [ ! -d "<+codebase.path>/templates" ]; then
+                        echo "Error: Templates directory not found"
+                        exit 1
+                      fi
+                      
+                      # Create necessary directories
+                      mkdir -p "${CACHE_DIR}/templates"
+                      mkdir -p "${CACHE_DIR}/docs-output"
+                      mkdir -p "${CACHE_DIR}/markers"
+                      
+                      # Log status
+                      echo "Environment validated and ready for documentation generation"
+                      echo "Templates directory: <+codebase.path>/templates"
+                      echo "Cache directory: ${CACHE_DIR}"
+
+              # Step 2: Prepare Templates and Cache
+              - step:
+                  name: Prepare Templates
+                  identifier: prepare_templates
+                  type: Plugin
+                  spec:
+                    connectorRef: account.harnessImage
+                    image: alpine:latest
+                    shell: Bash
+                    command: |
+                      # Copy templates to cache directory
+                      echo "Copying templates to cache directory..."
+                      cp -r <+codebase.path>/templates/* "${CACHE_DIR}/templates/"
+                      
+                      # Generate a hash of all templates for cache invalidation
+                      TEMPLATE_HASH=$(find "${CACHE_DIR}/templates" -type f -exec md5sum {} \; | sort | md5sum | cut -d ' ' -f 1)
+                      echo "Template hash: ${TEMPLATE_HASH}"
+                      
+                      # Store hash for later steps
+                      echo "${TEMPLATE_HASH}" > "${CACHE_DIR}/markers/template-hash.txt"
+                      
+                      # Check if cached documentation exists and is valid
+                      if [ -f "${CACHE_DIR}/markers/generated-hash.txt" ]; then
+                        CACHED_HASH=$(cat "${CACHE_DIR}/markers/generated-hash.txt")
+                        
+                        if [ "${TEMPLATE_HASH}" = "${CACHED_HASH}" ] && [ "${FORCE_REGEN}" != "true" ]; then
+                          echo "Cache is valid: Templates haven't changed since last generation"
+                          echo "true" > "${CACHE_DIR}/markers/cache-valid.txt"
+                        else
+                          echo "Cache invalid: Templates have changed since last generation"
+                          echo "false" > "${CACHE_DIR}/markers/cache-valid.txt"
+                        fi
+                      else
+                        echo "No existing cache found, documentation will be generated"
+                        echo "false" > "${CACHE_DIR}/markers/cache-valid.txt"
+                      fi
+                      
+                      # Set output variables for conditional execution
+                      echo "Setting output variables for later steps..."
+                      CACHE_VALID=$(cat "${CACHE_DIR}/markers/cache-valid.txt")
+                      echo "::set-output name=CACHE_VALID::${CACHE_VALID}"
+                  caching:
+                    enabled: true
+                    paths:
+                      - ${CACHE_DIR}/templates
+                      - ${CACHE_DIR}/markers
+                  outputs:
+                    - name: CACHE_VALID
+                      type: String
+                      value: <+execution.steps.prepare_templates.output.outputVariables.CACHE_VALID>
+
+              # Step 3: Template Validation - Using conditional execution
+              - step:
+                  name: Validate Templates
+                  identifier: validate_templates
+                  type: Plugin
+                  spec:
+                    connectorRef: account.harnessImage
+                    image: ka1ne/template-doc-gen:pipeline
+                    shell: Bash
+                    command: |
+                      # Run validation using the template-doc-gen tool
+                      echo "Validating templates..."
+                      tempdocs validate \
+                        --source "${CACHE_DIR}/templates" \
+                        --verbose
+                  when:
+                    stageStatus: Success
+                    condition: <+pipeline.variables.FORCE_REGEN> == "true" || <+execution.steps.prepare_templates.output.outputVariables.CACHE_VALID> == "false"
+
+              # Step 4: Generate Documentation - Using cached template
+              - step:
+                  name: Generate Documentation
+                  identifier: generate_docs
+                  template:
+                    templateRef: template_doc_gen_cached
+                    versionLabel: 1.0.0
+                    templateInputs:
+                      type: Plugin
+                      spec:
+                        connectorRef: account.harnessImage
+                      variables:
+                        sourceDir: ${CACHE_DIR}/templates
+                        outputDir: ${CACHE_DIR}/docs-output
+                        hashFile: ${CACHE_DIR}/markers/template-hash.txt
+                      parameters:
+                        format: html
+                        failOnValidationError: true
+                        concurrency: 8
+                        skipIfCacheValid: true
+                        forceRegeneration: <+pipeline.variables.FORCE_REGEN>
+                  when:
+                    stageStatus: Success
+                    condition: <+pipeline.variables.FORCE_REGEN> == "true" || <+execution.steps.prepare_templates.output.outputVariables.CACHE_VALID> == "false"
+
+              # Step 5: Copy from Cache - This step runs even if we use cache
+              - step:
+                  name: Recover Docs from Cache
+                  identifier: recover_docs
+                  type: Run
+                  spec:
+                    connectorRef: account.harnessImage
+                    image: alpine:latest
+                    shell: Bash
+                    command: |
+                      # If we're using cache, make sure we copy the cached docs
+                      if [ "<+execution.steps.prepare_templates.output.outputVariables.CACHE_VALID>" == "true" ] && [ "<+pipeline.variables.FORCE_REGEN>" != "true" ]; then
+                        echo "Using cached documentation..."
+                        # Ensure the cached docs are used if nothing was regenerated
+                        if [ ! -f "${CACHE_DIR}/docs-output/index.html" ]; then
+                          echo "Recovering from previous cache..."
+                          mkdir -p "${CACHE_DIR}/docs-output"
+                          cp -r "${CACHE_DIR}/docs-archive/"* "${CACHE_DIR}/docs-output/" 2>/dev/null || echo "No archived docs found, cache may be empty"
+                        fi
+                      else
+                        # Archive the newly generated docs for future cache use
+                        echo "Archiving generated documentation for future cache use..."
+                        mkdir -p "${CACHE_DIR}/docs-archive"
+                        cp -r "${CACHE_DIR}/docs-output/"* "${CACHE_DIR}/docs-archive/" 2>/dev/null || echo "No docs to archive"
+                      fi
+
+              # Step 6: Publish to Workspace
+              - step:
+                  name: Publish Documentation
+                  identifier: publish_docs
+                  type: Run
+                  spec:
+                    connectorRef: account.harnessImage
+                    image: alpine:latest
+                    shell: Bash
+                    command: |
+                      # Copy from cache to workspace directory
+                      mkdir -p "${WORKSPACE_DIR}/docs"
+                      cp -r "${CACHE_DIR}/docs-output/"* "${WORKSPACE_DIR}/docs/" || { echo "Error: No documentation to copy"; exit 1; }
+                      
+                      # Create a tarball for artifact deployment if needed
+                      if [ "<+pipeline.variables.DEPLOYMENT_TYPE>" == "artifact" ]; then
+                        mkdir -p "${WORKSPACE_DIR}/artifacts"
+                        TARBALL_NAME="template-docs-$(date +%Y%m%d-%H%M%S).tar.gz"
+                        tar -czf "${WORKSPACE_DIR}/artifacts/$TARBALL_NAME" -C "${WORKSPACE_DIR}/docs" .
+                        echo "Tarball created: ${WORKSPACE_DIR}/artifacts/$TARBALL_NAME"
+                      fi
+                      
+                      # Print information about the generated documentation
+                      echo "Documentation published to workspace"
+                      echo "Files available at: ${WORKSPACE_DIR}/docs"
+                      echo "File count: $(find "${WORKSPACE_DIR}/docs" -type f | wc -l)"
+                      echo "Total size: $(du -sh "${WORKSPACE_DIR}/docs" | cut -f1)"
+
+    - stage:
+        name: Deploy Documentation
+        identifier: deploy_documentation
+        description: Deploy the generated documentation
+        spec:
+          dependencies:
+            - stage: generate_documentation
+          infrastructure:
+            type: KubernetesDirect
+            spec:
+              connectorRef: <+input>
+              namespace: harness-docs
+              resources:
+                limits:
+                  cpu: 0.5
+                  memory: 1Gi
+                requests:
+                  cpu: 0.2
+                  memory: 512Mi
+              automountServiceAccountToken: true
+              nodeSelector: {}
+              os: Linux
+          execution:
+            steps:
+              # Step 1: Verify Documentation
+              - step:
+                  name: Verify Documentation
+                  identifier: verify_docs
+                  type: Run
+                  spec:
+                    connectorRef: account.harnessImage
+                    image: alpine:latest
+                    shell: Bash
+                    command: |
+                      # Verify documentation files from previous stage
+                      echo "Verifying documentation from workspace..."
+                      
+                      if [ ! -d "${WORKSPACE_DIR}/docs" ]; then
+                        echo "Error: Documentation directory not found in workspace"
+                        exit 1
+                      fi
+                      
+                      # Check for key files
+                      if [ ! -f "${WORKSPACE_DIR}/docs/index.html" ]; then
+                        echo "Error: index.html not found in documentation"
+                        exit 1
+                      fi
+                      
+                      echo "Documentation verification passed"
+                      echo "Ready for deployment"
+
+              # Step 2: Deploy Documentation based on deployment type
+              - step:
+                  name: Deployment Selector
+                  identifier: deployment_selector
+                  type: Run
+                  spec:
+                    connectorRef: account.harnessImage
+                    image: alpine:latest
+                    shell: Bash
+                    command: |
+                      # Select the appropriate deployment method
+                      case "<+pipeline.variables.DEPLOYMENT_TYPE>" in
+                        "git")
+                          echo "Selected Git-based deployment"
+                          echo "::set-output name=DEPLOY_METHOD::git"
+                          ;;
+                        "artifact")
+                          echo "Selected Artifact deployment"
+                          echo "::set-output name=DEPLOY_METHOD::artifact"
+                          ;;
+                        *)
+                          echo "No deployment selected or using 'none'"
+                          echo "Documentation will be available in the workspace only"
+                          echo "::set-output name=DEPLOY_METHOD::none"
+                          ;;
+                      esac
+                  outputs:
+                    - name: DEPLOY_METHOD
+                      type: String
+                      value: <+execution.steps.deployment_selector.output.outputVariables.DEPLOY_METHOD>
+
+              # Git-based deployment (Git Pages, GitLab Pages, etc.)
+              - step:
+                  name: Deploy to Git Repository
+                  identifier: deploy_git
+                  type: GitPush
+                  spec:
+                    connectorRef: <+input>
+                    gitFetchType: branch
+                    branch: <+input>
+                    repoName: <+input>
+                    folderPath: ${WORKSPACE_DIR}/docs
+                    commitMessage: "chore: update template documentation [skip ci]"
+                    destinationDirectory: <+pipeline.variables.DOCS_TARGET_DIR>
+                    autoCreateBranch: true
+                  when:
+                    stageStatus: Success
+                    condition: <+execution.steps.deployment_selector.output.outputVariables.DEPLOY_METHOD> == "git"
+
+              # Artifact-based deployment (generic)
+              - step:
+                  name: Upload Documentation Artifact
+                  identifier: upload_artifact
+                  type: UploadArtifacts
+                  spec:
+                    connectorRef: <+input>
+                    artifactPath: ${WORKSPACE_DIR}/artifacts/*.tar.gz
+                    metadata:
+                      artifactName: template-docs
+                      category: documentation
+                  when:
+                    stageStatus: Success
+                    condition: <+execution.steps.deployment_selector.output.outputVariables.DEPLOY_METHOD> == "artifact"
+
+    # Notification Stage
+    - stage:
+        name: Notify
+        identifier: notify
+        description: Send notifications about documentation generation
+        spec:
+          dependencies:
+            - stage: deploy_documentation
+          infrastructure:
+            useFromStage: deploy_documentation
+          execution:
+            steps:
+              - step:
+                  name: Email Notification
+                  identifier: email_notification
+                  type: Email
+                  spec:
+                    to: <+input>
+                    cc: <+input>
+                    subject: "Template Documentation Updated"
+                    body: |
+                      Template documentation has been updated and deployed.
+                      
+                      Summary:
+                      - Repository: <+codebase.repoUrl>
+                      - Branch: <+codebase.branch>
+                      - Commit: <+codebase.commitSha>
+                      - Deployment Method: <+pipeline.variables.DEPLOYMENT_TYPE>
+                      
+                      This is an automated message from the Harness Template Documentation Generator pipeline.
+                    
+                    attachErrorLogs: true
+                  when:
+                    stageStatus: Success
+                    condition: <+execution.stages.deploy_documentation.status> == "Success" 

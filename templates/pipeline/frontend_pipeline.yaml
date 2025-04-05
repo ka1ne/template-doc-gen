@@ -1,0 +1,351 @@
+template:
+  name: Modern Frontend Deployment Pipeline
+  identifier: Modern_Frontend_Deployment
+  versionLabel: 1.0.0
+  type: Pipeline
+  projectIdentifier: default
+  orgIdentifier: default
+  description: "Complete pipeline for building, testing, and deploying modern frontend applications (React, Vue, Angular)"
+  author: "Frontend Platform Team"
+  tags:
+    - frontend
+    - react
+    - vue
+    - angular
+    - web
+    - deployment
+    - static
+  variables:
+    gitRepoUrl:
+      description: "Git repository URL"
+      type: string
+      required: true
+      scope: pipeline
+    buildCommand:
+      description: "Command to build the frontend application (e.g., npm run build)"
+      type: string
+      required: true
+      scope: pipeline
+    targetEnvironment:
+      description: "Environment to deploy to (development, staging, production)"
+      type: string
+      required: true
+      scope: pipeline
+    cloudProvider:
+      description: "Cloud provider for deployment (aws, azure, gcp)"
+      type: string
+      required: true
+      scope: pipeline
+  parameters:
+    nodeVersion:
+      description: "Node.js version to use"
+      type: string
+      required: false
+      default: "18.x"
+      scope: pipeline
+    runUnitTests:
+      description: "Whether to run unit tests"
+      type: boolean
+      required: false
+      default: true
+      scope: pipeline
+    runE2ETests:
+      description: "Whether to run end-to-end tests"
+      type: boolean
+      required: false
+      default: false
+      scope: pipeline
+    enableCDN:
+      description: "Whether to enable CDN for the deployment"
+      type: boolean
+      required: false
+      default: true
+      scope: pipeline
+    optimizeAssets:
+      description: "Whether to optimize assets for production"
+      type: boolean
+      required: false
+      default: true
+      scope: pipeline
+  spec:
+    stages:
+      - stage:
+          name: Setup and Build
+          identifier: SetupAndBuild
+          description: "Install dependencies and build the application"
+          type: CI
+          spec:
+            cloneCodebase: true
+            platform:
+              os: Linux
+              arch: Amd64
+            runtime:
+              type: Cloud
+              spec: {}
+            execution:
+              steps:
+                - step:
+                    type: Run
+                    name: Setup Node.js
+                    identifier: SetupNode
+                    spec:
+                      shell: Bash
+                      command: |
+                        # Install nvm for Node.js version management
+                        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash
+                        export NVM_DIR="$HOME/.nvm"
+                        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+                        
+                        # Install and use specified Node.js version
+                        nvm install ${nodeVersion}
+                        nvm use ${nodeVersion}
+                        
+                        # Show versions
+                        node --version
+                        npm --version
+                - step:
+                    type: Run
+                    name: Install Dependencies
+                    identifier: InstallDependencies
+                    spec:
+                      shell: Bash
+                      command: |
+                        export NVM_DIR="$HOME/.nvm"
+                        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+                        
+                        # Check for package-lock.json or yarn.lock
+                        if [ -f "yarn.lock" ]; then
+                          echo "Using Yarn for dependency installation"
+                          yarn install --frozen-lockfile
+                        else
+                          echo "Using NPM for dependency installation"
+                          npm ci
+                        fi
+                - step:
+                    type: Run
+                    name: Run Linting
+                    identifier: RunLinting
+                    spec:
+                      shell: Bash
+                      command: |
+                        export NVM_DIR="$HOME/.nvm"
+                        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+                        
+                        # Check if the project has a lint script
+                        if grep -q '"lint"' package.json; then
+                          echo "Running linting..."
+                          npm run lint
+                        else
+                          echo "No lint script found, skipping"
+                        fi
+                - step:
+                    type: Run
+                    name: Run Unit Tests
+                    identifier: RunUnitTests
+                    when:
+                      stageStatus: Success
+                      condition: <+pipeline.parameters.runUnitTests>
+                    spec:
+                      shell: Bash
+                      command: |
+                        export NVM_DIR="$HOME/.nvm"
+                        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+                        
+                        echo "Running unit tests..."
+                        npm test -- --coverage
+                - step:
+                    type: Run
+                    name: Build Application
+                    identifier: BuildApplication
+                    spec:
+                      shell: Bash
+                      command: |
+                        export NVM_DIR="$HOME/.nvm"
+                        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+                        
+                        # If asset optimization is enabled for production
+                        if [ "${optimizeAssets}" = "true" ] && [ "${targetEnvironment}" = "production" ]; then
+                          export NODE_ENV=production
+                          echo "Building with production optimization enabled"
+                        else
+                          echo "Building application without full optimization"
+                        fi
+                        
+                        # Run build command
+                        ${buildCommand}
+                        
+                        # Check build output
+                        if [ -d "build" ]; then
+                          echo "Build output is in the 'build' directory"
+                          ls -la build
+                        elif [ -d "dist" ]; then
+                          echo "Build output is in the 'dist' directory"
+                          ls -la dist
+                        fi
+      - stage:
+          name: End-to-End Tests
+          identifier: E2ETests
+          description: "Run end-to-end tests with Cypress"
+          type: CI
+          when:
+            pipelineStatus: Success
+            condition: <+pipeline.parameters.runE2ETests>
+          spec:
+            platform:
+              os: Linux
+              arch: Amd64
+            runtime:
+              type: Cloud
+              spec: {}
+            execution:
+              steps:
+                - step:
+                    type: Run
+                    name: Setup Test Environment
+                    identifier: SetupTestEnv
+                    spec:
+                      shell: Bash
+                      command: |
+                        export NVM_DIR="$HOME/.nvm"
+                        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+                        
+                        # Install Cypress dependencies
+                        echo "Installing Cypress system dependencies..."
+                        apt-get update
+                        apt-get install -y libgtk2.0-0 libgtk-3-0 libgbm-dev libnotify-dev \
+                          libgconf-2-4 libnss3 libxss1 libasound2 libxtst6 xauth xvfb
+                - step:
+                    type: Run
+                    name: Run Cypress Tests
+                    identifier: RunCypressTests
+                    spec:
+                      shell: Bash
+                      command: |
+                        export NVM_DIR="$HOME/.nvm"
+                        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+                        
+                        # Check for cypress command
+                        if [ -f "node_modules/.bin/cypress" ]; then
+                          echo "Running Cypress tests headlessly..."
+                          npx cypress run
+                        else
+                          echo "Cypress not found, installing..."
+                          npm install cypress --save-dev
+                          npx cypress run
+                        fi
+      - stage:
+          name: Deploy Frontend
+          identifier: DeployFrontend
+          description: "Deploy to static hosting or CDN"
+          type: Deployment
+          spec:
+            deploymentType: Custom
+            execution:
+              steps:
+                - step:
+                    type: Run
+                    name: Prepare for Deployment
+                    identifier: PrepareDeployment
+                    spec:
+                      shell: Bash
+                      command: |
+                        # Determine build output directory
+                        if [ -d "build" ]; then
+                          BUILD_DIR="build"
+                        elif [ -d "dist" ]; then
+                          BUILD_DIR="dist"
+                        else
+                          echo "Could not find build output directory"
+                          exit 1
+                        fi
+                        
+                        # Set environment-specific config
+                        echo "Preparing deployment for ${targetEnvironment} environment"
+                        
+                        # Store the build directory for subsequent steps
+                        export BUILD_DIR=$BUILD_DIR
+                - step:
+                    type: Run
+                    name: Deploy to Cloud Provider
+                    identifier: DeployToCloud
+                    spec:
+                      shell: Bash
+                      command: |
+                        # Get build directory from previous step
+                        BUILD_DIR=$BUILD_DIR
+                        
+                        # Deploy based on cloud provider
+                        if [ "${cloudProvider}" = "aws" ]; then
+                          echo "Deploying to AWS S3 and CloudFront..."
+                          # Install AWS CLI
+                          apt-get update && apt-get install -y awscli
+                          
+                          # Deploy to S3 bucket
+                          BUCKET_NAME="frontend-${targetEnvironment}"
+                          aws s3 sync $BUILD_DIR s3://$BUCKET_NAME --delete
+                          
+                          # If CDN is enabled, invalidate CloudFront cache
+                          if [ "${enableCDN}" = "true" ]; then
+                            echo "Invalidating CloudFront cache..."
+                            aws cloudfront create-invalidation --distribution-id ${CLOUDFRONT_ID} --paths "/*"
+                          fi
+                          
+                        elif [ "${cloudProvider}" = "azure" ]; then
+                          echo "Deploying to Azure Storage and CDN..."
+                          # Install Azure CLI
+                          curl -sL https://aka.ms/InstallAzureCLIDeb | bash
+                          
+                          # Deploy to Azure Storage
+                          az storage blob upload-batch -d '$web' -s $BUILD_DIR --account-name ${STORAGE_ACCOUNT}
+                          
+                          # If CDN is enabled, purge Azure CDN
+                          if [ "${enableCDN}" = "true" ]; then
+                            echo "Purging Azure CDN..."
+                            az cdn endpoint purge --content-paths "/*" -n ${CDN_ENDPOINT} -g ${RESOURCE_GROUP} --profile-name ${CDN_PROFILE}
+                          fi
+                          
+                        elif [ "${cloudProvider}" = "gcp" ]; then
+                          echo "Deploying to Google Cloud Storage..."
+                          # Install Google Cloud SDK
+                          apt-get update && apt-get install -y apt-transport-https ca-certificates gnupg
+                          echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
+                          curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
+                          apt-get update && apt-get install -y google-cloud-sdk
+                          
+                          # Deploy to GCS bucket
+                          BUCKET_NAME="gs://frontend-${targetEnvironment}"
+                          gsutil -m rsync -d -r $BUILD_DIR $BUCKET_NAME
+                          
+                          # If CDN is enabled, set cache-control headers
+                          if [ "${enableCDN}" = "true" ]; then
+                            echo "Setting cache headers for CDN..."
+                            gsutil -m setmeta -h "Cache-Control:public, max-age=31536000" $BUCKET_NAME/**/*.{js,css,png,jpg,jpeg,gif,svg,woff,woff2,ttf,eot}
+                            gsutil -m setmeta -h "Cache-Control:no-cache, no-store" $BUCKET_NAME/index.html
+                          fi
+                        else
+                          echo "Unsupported cloud provider: ${cloudProvider}"
+                          exit 1
+                        fi
+                        
+                        echo "Deployment completed successfully"
+  examples:
+    - |
+      # Example usage for a React application on AWS
+      pipeline:
+        name: My React App Pipeline
+        identifier: my_react_app_pipeline
+        template:
+          name: Modern Frontend Deployment Pipeline
+          identifier: Modern_Frontend_Deployment
+          versionLabel: 1.0.0
+        variables:
+          gitRepoUrl: github.com/myorg/my-react-app
+          buildCommand: npm run build
+          targetEnvironment: staging
+          cloudProvider: aws
+        parameters:
+          nodeVersion: "16.x"
+          runUnitTests: true
+          runE2ETests: true
+          enableCDN: true
+          optimizeAssets: true 

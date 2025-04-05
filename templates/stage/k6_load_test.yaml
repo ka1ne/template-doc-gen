@@ -1,0 +1,146 @@
+template:
+  name: K6 Load Testing Stage
+  identifier: K6_Load_Testing_Stage
+  versionLabel: 1.0.0
+  type: Stage
+  projectIdentifier: default
+  orgIdentifier: default
+  description: "Performs load testing on APIs and web applications using k6"
+  author: "Performance Team"
+  tags:
+    - performance
+    - load-testing
+    - k6
+    - testing
+  variables:
+    targetUrl:
+      description: "Base URL of the application to test"
+      type: string
+      required: true
+      scope: stage
+    scriptPath:
+      description: "Path to k6 script file (relative to repo root)"
+      type: string
+      required: true
+      scope: stage
+  parameters:
+    virtualUsers:
+      description: "Number of virtual users to simulate"
+      type: number
+      required: false
+      default: 50
+      scope: stage
+    duration:
+      description: "Duration of the test in seconds or with time unit (e.g., 1m30s)"
+      type: string
+      required: false
+      default: "30s"
+      scope: stage
+    failOnPerformanceThresholds:
+      description: "Whether to fail the stage if performance thresholds are not met"
+      type: boolean
+      required: false
+      default: true
+      scope: stage
+    dashboardEnabled:
+      description: "Whether to enable the k6 cloud dashboard"
+      type: boolean
+      required: false
+      default: false
+      scope: stage
+  spec:
+    type: CI
+    spec:
+      platform:
+        os: Linux
+        arch: Amd64
+      runtime:
+        type: Cloud
+        spec: {}
+      execution:
+        steps:
+          - step:
+              type: Run
+              name: Install k6
+              identifier: InstallK6
+              spec:
+                shell: Bash
+                command: |
+                  # Install k6 from official package repositories
+                  sudo apt-get update
+                  sudo apt-get install -y dirmngr gnupg apt-transport-https ca-certificates
+                  sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+                  echo "deb https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+                  sudo apt-get update
+                  sudo apt-get install -y k6
+                  k6 version
+          - step:
+              type: Run
+              name: Run Load Test
+              identifier: RunLoadTest
+              spec:
+                shell: Bash
+                command: |
+                  # Create run options based on parameters
+                  RUN_OPTS="--vus ${virtualUsers} --duration ${duration}"
+                  
+                  # Set up environment variables for the test
+                  export TARGET_URL="${targetUrl}"
+                  
+                  # Print test configuration
+                  echo "Running k6 test with:"
+                  echo "- Script: ${scriptPath}"
+                  echo "- Target URL: ${targetUrl}"
+                  echo "- Virtual Users: ${virtualUsers}"
+                  echo "- Duration: ${duration}"
+                  
+                  # Execute the test
+                  if [ "${failOnPerformanceThresholds}" = "true" ]; then
+                    # Fail if thresholds are not met
+                    k6 run $RUN_OPTS ${scriptPath}
+                  else
+                    # Don't fail on threshold errors
+                    k6 run $RUN_OPTS ${scriptPath} || true
+                  fi
+                  
+                  echo "Load test completed"
+          - step:
+              type: Run
+              name: Generate Load Test Report
+              identifier: GenerateLoadTestReport
+              spec:
+                shell: Bash
+                command: |
+                  # Create a simple HTML report from k6 outputs
+                  echo "Creating test summary report..."
+                  echo "<html><head><title>K6 Load Test Report</title></head><body>" > k6-report.html
+                  echo "<h1>K6 Load Test Report</h1>" >> k6-report.html
+                  echo "<p>Target URL: ${targetUrl}</p>" >> k6-report.html
+                  echo "<p>Test Duration: ${duration}</p>" >> k6-report.html
+                  echo "<p>Virtual Users: ${virtualUsers}</p>" >> k6-report.html
+                  echo "</body></html>" >> k6-report.html
+                  
+                  echo "Report created at k6-report.html"
+    failureStrategies:
+      - onFailure:
+          errors:
+            - AllErrors
+          action:
+            type: Abort
+  examples:
+    - |
+      # Example usage in a pipeline
+      stages:
+        - stage:
+            template:
+              name: K6 Load Testing Stage
+              identifier: K6_Load_Testing_Stage
+              versionLabel: 1.0.0
+            variables:
+              targetUrl: https://api.example.com
+              scriptPath: ./tests/performance/api-test.js
+            parameters:
+              virtualUsers: 100
+              duration: 2m
+              failOnPerformanceThresholds: true
+              dashboardEnabled: false 
