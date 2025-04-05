@@ -1,0 +1,222 @@
+template:
+  name: Accessibility Testing Steps
+  identifier: Accessibility_Testing_Steps
+  versionLabel: 1.0.0
+  type: StepGroup
+  projectIdentifier: default
+  orgIdentifier: default
+  description: "Runs accessibility testing for web applications using axe-core and Pa11y"
+  author: "Accessibility Team"
+  tags:
+    - accessibility
+    - a11y
+    - testing
+    - compliance
+    - wcag
+  variables:
+    siteUrl:
+      description: "URL of the site to test"
+      type: string
+      required: true
+      scope: stepgroup
+    crawlPaths:
+      description: "Comma-separated list of paths to test (e.g., /,/about,/contact)"
+      type: string
+      required: false
+      scope: stepgroup
+  parameters:
+    wcagLevel:
+      description: "WCAG compliance level to test against (A, AA, AAA)"
+      type: string
+      required: false
+      default: "AA"
+      scope: stepgroup
+    failOnErrors:
+      description: "Whether to fail the pipeline if accessibility errors are found"
+      type: boolean
+      required: false
+      default: false
+      scope: stepgroup
+    generateReport:
+      description: "Whether to generate a detailed HTML report"
+      type: boolean
+      required: false
+      default: true
+      scope: stepgroup
+  spec:
+    steps:
+      - step:
+          type: Run
+          name: Install Testing Tools
+          identifier: InstallTools
+          spec:
+            shell: Bash
+            command: |
+              # Install Node.js if not already installed
+              if ! command -v node &> /dev/null; then
+                echo "Installing Node.js..."
+                curl -sL https://deb.nodesource.com/setup_16.x | bash -
+                apt-get install -y nodejs
+              fi
+              
+              # Install Pa11y and axe-core
+              npm install -g pa11y pa11y-ci axe-core puppeteer
+              
+              # Install HTML report generator
+              npm install -g pa11y-reporter-html
+              
+              # Verify installations
+              pa11y --version
+              echo "Accessibility testing tools installed successfully"
+      - step:
+          type: Run
+          name: Create Test Configuration
+          identifier: CreateTestConfig
+          spec:
+            shell: Bash
+            command: |
+              # Create configuration directory
+              mkdir -p a11y-test-config
+              
+              # Create Pa11y configuration file
+              cat > a11y-test-config/pa11y-config.json << EOF
+              {
+                "standard": "WCAG2${wcagLevel}",
+                "timeout": 60000,
+                "wait": 2000,
+                "chromeLaunchConfig": {
+                  "args": ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
+                }
+              }
+              EOF
+              
+              # Create URLs list if paths provided
+              if [ -n "${crawlPaths}" ]; then
+                echo "Creating URLs list from provided paths..."
+                for path in ${crawlPaths//,/ }; do
+                  echo "${siteUrl}${path}" >> a11y-test-config/urls.txt
+                done
+              else
+                echo "No paths provided, testing main URL only"
+                echo "${siteUrl}" > a11y-test-config/urls.txt
+              fi
+              
+              cat a11y-test-config/urls.txt
+              echo "Test configuration created"
+      - step:
+          type: Run
+          name: Run Accessibility Audit
+          identifier: RunA11yAudit
+          spec:
+            shell: Bash
+            command: |
+              # Create results directory
+              mkdir -p a11y-results
+              
+              # Run Pa11y with axe-core ruleset
+              echo "Running accessibility tests with Pa11y..."
+              
+              # Test each URL and collect results
+              while read url; do
+                echo "Testing $url"
+                pageName=$(echo $url | sed 's/[^a-zA-Z0-9]/_/g')
+                
+                if [ "${generateReport}" = "true" ]; then
+                  pa11y "$url" --config a11y-test-config/pa11y-config.json --reporter html > "a11y-results/${pageName}.html"
+                else
+                  pa11y "$url" --config a11y-test-config/pa11y-config.json > "a11y-results/${pageName}.txt"
+                fi
+                
+                # Store exit code to determine if there were failures
+                RESULT=$?
+                if [ $RESULT -ne 0 ]; then
+                  echo "Accessibility issues found on $url"
+                  FAILURES=true
+                fi
+              done < a11y-test-config/urls.txt
+              
+              # Generate summary
+              echo "Accessibility testing completed."
+              echo "Results saved in a11y-results directory."
+              
+              # Determine if we should fail the build
+              if [ "${failOnErrors}" = "true" ] && [ "$FAILURES" = "true" ]; then
+                echo "Accessibility errors found. Failing the build as requested."
+                exit 1
+              else
+                if [ "$FAILURES" = "true" ]; then
+                  echo "Accessibility errors found, but continuing as requested."
+                else
+                  echo "No accessibility errors found!"
+                fi
+              fi
+      - step:
+          type: Run
+          name: Generate Summary Report
+          identifier: GenerateSummary
+          when:
+            stageStatus: Success
+            condition: <+stepgroup.parameters.generateReport>
+          spec:
+            shell: Bash
+            command: |
+              # Create a simple index HTML file that links to all generated reports
+              cat > a11y-results/index.html << EOF
+              <!DOCTYPE html>
+              <html lang="en">
+              <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Accessibility Test Results</title>
+                <style>
+                  body { font-family: sans-serif; line-height: 1.6; margin: 0; padding: 20px; color: #333; }
+                  h1 { color: #2c3e50; }
+                  .summary { background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+                  .results-list { list-style: none; padding: 0; }
+                  .results-list li { margin-bottom: 10px; padding: 10px; background: #fff; border-left: 4px solid #3498db; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+                  .results-list a { color: #3498db; text-decoration: none; font-weight: bold; }
+                  .results-list a:hover { text-decoration: underline; }
+                </style>
+              </head>
+              <body>
+                <h1>Accessibility Test Results</h1>
+                <div class="summary">
+                  <p><strong>Site URL:</strong> ${siteUrl}</p>
+                  <p><strong>WCAG Level:</strong> ${wcagLevel}</p>
+                  <p><strong>Test Date:</strong> $(date)</p>
+                </div>
+                <h2>Results by Page</h2>
+                <ul class="results-list">
+              EOF
+              
+              # Add links to individual page reports
+              find a11y-results -name "*.html" -not -name "index.html" | sort | while read report; do
+                pageName=$(basename "$report" .html)
+                pageUrl=$(grep -o "${siteUrl}[^ ]*" a11y-test-config/urls.txt | grep -i "${pageName//\_/}" || echo "Unknown page")
+                echo "  <li><a href=\"$(basename "$report")\">${pageUrl}</a></li>" >> a11y-results/index.html
+              done
+              
+              # Close HTML tags
+              cat >> a11y-results/index.html << EOF
+                </ul>
+              </body>
+              </html>
+              EOF
+              
+              echo "Summary report generated at a11y-results/index.html"
+  examples:
+    - |
+      # Example usage in a pipeline stage
+      steps:
+        - stepGroup:
+            template:
+              name: Accessibility Testing Steps
+              identifier: Accessibility_Testing_Steps
+              versionLabel: 1.0.0
+            variables:
+              siteUrl: https://www.example.com
+              crawlPaths: /,/about,/products,/contact
+            parameters:
+              wcagLevel: AA
+              failOnErrors: false
+              generateReport: true 

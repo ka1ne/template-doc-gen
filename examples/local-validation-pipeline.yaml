@@ -1,0 +1,216 @@
+pipeline:
+  name: Local Template Documentation Validator
+  identifier: local_template_validator
+  projectIdentifier: default
+  orgIdentifier: default
+  tags:
+    category: documentation
+    type: validation
+  
+  # Pipeline Variables
+  variables:
+    - name: SOURCE_DIR
+      type: String
+      description: "Directory containing template YAML files"
+      required: true
+      value: "./templates"
+    - name: OUTPUT_DIR
+      type: String
+      description: "Directory where documentation will be generated"
+      required: true
+      value: "./docs/output"
+    - name: FORCE_REGEN
+      type: String
+      description: "Set to 'true' to force documentation regeneration"
+      required: false
+      value: "false"
+
+  # A single stage for local validation
+  stages:
+    - stage:
+        name: Local Documentation Generation
+        identifier: local_doc_gen
+        description: Generate and validate documentation locally
+        spec:
+          # No infrastructure specification - will run on local runner
+          execution:
+            steps:
+              # Step 1: Validate environment
+              - step:
+                  name: Validate Environment
+                  identifier: validate_env
+                  type: Run
+                  spec:
+                    connectorRef: account.harnessImage
+                    image: alpine:latest
+                    shell: Bash
+                    command: |
+                      # Validate template directory exists
+                      if [ ! -d "<+pipeline.variables.SOURCE_DIR>" ]; then
+                        echo "Error: Template directory not found: <+pipeline.variables.SOURCE_DIR>"
+                        exit 1
+                      fi
+                      
+                      # Create output directory if it doesn't exist
+                      mkdir -p "<+pipeline.variables.OUTPUT_DIR>"
+                      
+                      # Display environment information
+                      echo "Local validation environment ready"
+                      echo "Template source: <+pipeline.variables.SOURCE_DIR>"
+                      echo "Output directory: <+pipeline.variables.OUTPUT_DIR>"
+                      
+                      # Count templates
+                      TEMPLATE_COUNT=$(find "<+pipeline.variables.SOURCE_DIR>" -type f -name "*.yaml" | wc -l)
+                      echo "Found ${TEMPLATE_COUNT} template files to process"
+
+              # Step 2: Generate template hash
+              - step:
+                  name: Generate Template Hash
+                  identifier: generate_hash
+                  type: Run
+                  spec:
+                    connectorRef: account.harnessImage
+                    image: alpine:latest
+                    shell: Bash
+                    command: |
+                      # Generate a hash of all templates
+                      TEMPLATE_HASH=$(find "<+pipeline.variables.SOURCE_DIR>" -type f -exec md5sum {} \; | sort | md5sum | cut -d ' ' -f 1)
+                      echo "Template hash: ${TEMPLATE_HASH}"
+                      
+                      # Store hash
+                      mkdir -p "$(dirname <+pipeline.variables.OUTPUT_DIR>)/cache"
+                      echo "${TEMPLATE_HASH}" > "$(dirname <+pipeline.variables.OUTPUT_DIR>)/cache/template-hash.txt"
+                      
+                      # Cache validation logic
+                      if [ -f "$(dirname <+pipeline.variables.OUTPUT_DIR>)/cache/generated-hash.txt" ] && [ "<+pipeline.variables.FORCE_REGEN>" != "true" ]; then
+                        CACHED_HASH=$(cat "$(dirname <+pipeline.variables.OUTPUT_DIR>)/cache/generated-hash.txt")
+                        if [ "${TEMPLATE_HASH}" = "${CACHED_HASH}" ]; then
+                          echo "Cache is valid: Templates unchanged since last generation"
+                          echo "true" > "$(dirname <+pipeline.variables.OUTPUT_DIR>)/cache/cache-valid.txt"
+                        else
+                          echo "Cache invalid: Templates have changed since last generation"
+                          echo "false" > "$(dirname <+pipeline.variables.OUTPUT_DIR>)/cache/cache-valid.txt"
+                        fi
+                      else
+                        echo "No cache or regeneration forced"
+                        echo "false" > "$(dirname <+pipeline.variables.OUTPUT_DIR>)/cache/cache-valid.txt"
+                      fi
+                      
+                      # Set output
+                      CACHE_VALID=$(cat "$(dirname <+pipeline.variables.OUTPUT_DIR>)/cache/cache-valid.txt")
+                      echo "::set-output name=CACHE_VALID::${CACHE_VALID}"
+                  outputs:
+                    - name: CACHE_VALID
+                      type: String
+                      value: <+execution.steps.generate_hash.output.outputVariables.CACHE_VALID>
+
+              # Step 3: Validate Templates
+              - step:
+                  name: Validate Templates
+                  identifier: validate_templates
+                  type: Run
+                  spec:
+                    connectorRef: account.harnessImage
+                    image: ka1ne/template-doc-gen:pipeline
+                    shell: Bash
+                    command: |
+                      # Run template validation
+                      echo "Validating templates..."
+                      tempdocs validate --source "<+pipeline.variables.SOURCE_DIR>" --verbose
+                  when:
+                    stageStatus: Success
+                    condition: <+pipeline.variables.FORCE_REGEN> == "true" || <+execution.steps.generate_hash.output.outputVariables.CACHE_VALID> == "false"
+
+              # Step 4: Generate Documentation
+              - step:
+                  name: Generate Documentation
+                  identifier: generate_docs
+                  type: Run
+                  spec:
+                    connectorRef: account.harnessImage
+                    image: ka1ne/template-doc-gen:pipeline
+                    shell: Bash
+                    command: |
+                      # Skip if using cache
+                      if [ "<+execution.steps.generate_hash.output.outputVariables.CACHE_VALID>" == "true" ] && [ "<+pipeline.variables.FORCE_REGEN>" != "true" ]; then
+                        echo "Using cached documentation (templates unchanged)"
+                        
+                        # If we have archived docs, use them
+                        if [ -d "$(dirname <+pipeline.variables.OUTPUT_DIR>)/cache/docs-archive" ]; then
+                          echo "Recovering from archive..."
+                          cp -r "$(dirname <+pipeline.variables.OUTPUT_DIR>)/cache/docs-archive/"* "<+pipeline.variables.OUTPUT_DIR>/" 2>/dev/null || echo "No archived docs found"
+                        fi
+                      else
+                        # Generate new documentation
+                        echo "Generating documentation..."
+                        tempdocs generate \
+                          --source "<+pipeline.variables.SOURCE_DIR>" \
+                          --output "<+pipeline.variables.OUTPUT_DIR>" \
+                          --format "html" \
+                          --concurrency 4 \
+                          --verbose
+                        
+                        # Archive for cache
+                        mkdir -p "$(dirname <+pipeline.variables.OUTPUT_DIR>)/cache/docs-archive"
+                        cp -r "<+pipeline.variables.OUTPUT_DIR>/"* "$(dirname <+pipeline.variables.OUTPUT_DIR>)/cache/docs-archive/" 2>/dev/null || echo "No docs to archive"
+                        
+                        # Update hash for cache
+                        TEMPLATE_HASH=$(cat "$(dirname <+pipeline.variables.OUTPUT_DIR>)/cache/template-hash.txt")
+                        echo "${TEMPLATE_HASH}" > "$(dirname <+pipeline.variables.OUTPUT_DIR>)/cache/generated-hash.txt"
+                      fi
+
+              # Step 5: Verify Generated Documentation
+              - step:
+                  name: Verify Documentation
+                  identifier: verify_docs
+                  type: Run
+                  spec:
+                    connectorRef: account.harnessImage
+                    image: alpine:latest
+                    shell: Bash
+                    command: |
+                      # Verify documentation files
+                      echo "Verifying generated documentation..."
+                      
+                      if [ ! -d "<+pipeline.variables.OUTPUT_DIR>" ]; then
+                        echo "Error: Output directory not found"
+                        exit 1
+                      fi
+                      
+                      # Check for index.html
+                      if [ ! -f "<+pipeline.variables.OUTPUT_DIR>/index.html" ]; then
+                        echo "Error: index.html not found in documentation"
+                        exit 1
+                      fi
+                      
+                      # Count files
+                      DOC_COUNT=$(find "<+pipeline.variables.OUTPUT_DIR>" -type f | wc -l)
+                      echo "Documentation generated successfully with ${DOC_COUNT} files"
+                      echo "Documentation is available at: <+pipeline.variables.OUTPUT_DIR>"
+                      
+                      # Calculate size
+                      echo "Total size: $(du -sh "<+pipeline.variables.OUTPUT_DIR>" | cut -f1)"
+
+              # Step 6: Serve Documentation (Optional)
+              - step:
+                  name: Serve Documentation Locally
+                  identifier: serve_docs
+                  type: Run
+                  spec:
+                    connectorRef: account.harnessImage
+                    image: ka1ne/template-doc-gen:dev
+                    shell: Bash
+                    command: |
+                      # Optional step to serve documentation locally for preview
+                      # Will only run if explicitly enabled
+                      if [ "<+execution.steps.verify_docs.status>" == "Success" ]; then
+                        echo "Starting local documentation server..."
+                        echo "Documentation will be available at: http://localhost:8000/"
+                        echo "Press Ctrl+C to stop the server"
+                        
+                        # Use the fileserver to serve documentation
+                        fileserver -dir "<+pipeline.variables.OUTPUT_DIR>" -port 8000
+                      fi
+                  when:
+                    stageStatus: Success
+                    condition: <+input>.select("true", "false") == "true" 

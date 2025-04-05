@@ -22,7 +22,7 @@ var/
 
 # Go
 /bin/
-/pkg/
+/go-pkg/
 *.exe
 *.exe~
 *.dll

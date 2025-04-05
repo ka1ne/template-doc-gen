@@ -1,0 +1,76 @@
+template:
+  name: Template Documentation Generator
+  identifier: template_doc_gen
+  versionLabel: 1.0.0
+  type: Step
+  projectIdentifier: default
+  orgIdentifier: default
+  description: "Generate documentation from Harness templates"
+  tags:
+    - documentation
+    - templates
+  variables:
+    sourceDir:
+      description: "Source directory containing template YAML files"
+      type: string
+      required: true
+      scope: step
+    outputDir:
+      description: "Output directory for generated documentation"
+      type: string
+      required: true
+      scope: step
+  parameters:
+    format:
+      description: "Output format (html, json, markdown)"
+      type: string
+      required: false
+      default: "html"
+      scope: step
+    failOnValidationError:
+      description: "Fail the step if template validation fails"
+      type: boolean
+      required: false
+      default: true
+      scope: step
+    concurrency:
+      description: "Number of concurrent workers for processing templates"
+      type: number
+      required: false
+      default: 4
+      scope: step
+  spec:
+    type: Plugin
+    spec:
+      connectorRef: <+input>
+      image: ka1ne/template-doc-gen:pipeline
+      shell: Bash
+      command: |
+        # Create a function to run the template documentation generator
+        run_tempdocs() {
+          CMD="$@"
+          echo "Executing: $CMD"
+          if ! $CMD; then
+            if [[ "${failOnValidationError}" == "true" ]]; then
+              echo "Error: Template documentation generation failed"
+              exit 1
+            else
+              echo "Warning: Template documentation generation issues found, but continuing as per configuration"
+            fi
+          fi
+        }
+        
+        # 1. First validate the templates
+        run_tempdocs tempdocs validate --source "${sourceDir}" --concurrency ${concurrency}
+        
+        # 2. Then generate the documentation
+        run_tempdocs tempdocs generate --source "${sourceDir}" --output "${outputDir}" --format "${format}" --concurrency ${concurrency}
+        
+        # 3. Display summary
+        echo "Documentation generation complete!"
+        echo "Output format: ${format}"
+        echo "Output files location: ${outputDir}"
+        
+        # List generated files
+        echo "Generated files:"
+        find "${outputDir}" -type f | sort 

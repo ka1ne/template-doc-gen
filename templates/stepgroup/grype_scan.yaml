@@ -1,0 +1,105 @@
+template:
+  name: Grype Vulnerability Scanner
+  identifier: Grype_Vulnerability_Scanner
+  versionLabel: 1.0.0
+  type: StepGroup
+  projectIdentifier: default
+  orgIdentifier: default
+  description: "Scans container images for vulnerabilities using Anchore Grype"
+  author: "Security Team"
+  tags:
+    - security
+    - scan
+    - vulnerability
+    - container
+    - grype
+  variables:
+    imageReference:
+      description: "Container image to scan (e.g., alpine:latest)"
+      type: string
+      required: true
+      scope: stepgroup
+    outputFormat:
+      description: "Output format for the scan results (table, json, cyclonedx, sarif)"
+      type: string
+      required: false
+      scope: stepgroup
+  parameters:
+    severityThreshold:
+      description: "Minimum severity to fail the build (negligible, low, medium, high, critical)"
+      type: string
+      required: false
+      default: high
+      scope: stepgroup
+    failOnFindings:
+      description: "Whether to fail the pipeline if vulnerabilities are found"
+      type: boolean
+      required: false
+      default: true
+      scope: stepgroup
+    onlyFixable:
+      description: "Only report vulnerabilities that have a fix available"
+      type: boolean
+      required: false
+      default: false
+      scope: stepgroup
+  spec:
+    steps:
+      - step:
+          type: Run
+          name: Install Grype
+          identifier: InstallGrype
+          spec:
+            shell: Bash
+            command: |
+              curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+      - step:
+          type: Run
+          name: Scan Container Image
+          identifier: ScanContainerImage
+          spec:
+            shell: Bash
+            command: |
+              # Build command options
+              CMD_OPTS=""
+              
+              # Add output format if specified
+              if [ -n "${outputFormat}" ]; then
+                CMD_OPTS="$CMD_OPTS -o ${outputFormat}"
+              fi
+              
+              # Add only-fixable flag if enabled
+              if [ "${onlyFixable}" = "true" ]; then
+                CMD_OPTS="$CMD_OPTS --only-fixed"
+              fi
+              
+              # Add fail-on threshold
+              CMD_OPTS="$CMD_OPTS --fail-on ${severityThreshold}"
+              
+              # Run the scan
+              echo "Scanning image: ${imageReference}"
+              
+              if [ "${failOnFindings}" = "true" ]; then
+                grype ${imageReference} $CMD_OPTS
+              else
+                # Don't fail on findings
+                grype ${imageReference} $CMD_OPTS || true
+              fi
+              
+              echo "Scan completed"
+  examples:
+    - |
+      # Example usage in a stage
+      steps:
+        - stepGroup:
+            template:
+              name: Grype Vulnerability Scanner
+              identifier: Grype_Vulnerability_Scanner
+              versionLabel: 1.0.0
+            variables:
+              imageReference: <+artifacts.buildDocker.imageName>
+              outputFormat: sarif
+            parameters:
+              severityThreshold: high
+              failOnFindings: true
+              onlyFixable: false 

@@ -1,83 +1,89 @@
-# Template Documentation Generator Makefile
+# template docs generator makefile
 
-# Binary name and build directory
+# binaries and directories
 BINARY_NAME=tempdocs
 FILESERVER_BINARY=fileserver
 BUILD_DIR=bin
 GO_MAIN=./cmd/tempdocs
 FILESERVER_MAIN=./cmd/fileserver
 
-# Configuration (with defaults that can be overridden by .env file)
+# config defaults
 SOURCE_DIR ?= templates
 OUTPUT_DIR ?= docs/output
 FORMAT ?= html
 VALIDATE_ONLY ?= false
 VERBOSE ?= false
 
-# Docker image settings
+# docker settings
 DOCKER_IMAGE=ka1ne/template-doc-gen
 DOCKER_TAG=0.1.0-go
 
-# Load environment variables from .env file if it exists
+# load env file if exists
 ifneq (,$(wildcard .env))
 include .env
 export
 endif
 
 ############################
-# Core Application Targets #
+# core targets             #
 ############################
 
-# Default target
+# default target
 .PHONY: all
 all: build
 
-# Clean build artifacts
+# clean artifacts
 .PHONY: clean
 clean:
 	@echo "Cleaning build artifacts..."
 	rm -rf $(BUILD_DIR)
 	rm -rf $(OUTPUT_DIR)/*
 
-# Create necessary directories
+# create dirs
 .PHONY: dirs
 dirs:
 	@echo "Creating necessary directories..."
 	mkdir -p $(BUILD_DIR)
 	mkdir -p $(OUTPUT_DIR)
 
-# Build the core application
+# build app
 .PHONY: build
 build: dirs
 	@echo "Building $(BINARY_NAME)..."
-	go build -o $(BUILD_DIR)/$(BINARY_NAME) $(GO_MAIN)
+	go build \
+		-ldflags="-s -w \
+		-X github.com/ka1ne/template-doc-gen/internal/version.Version=$$(git describe --tags --always --dirty 2>/dev/null || echo "dev") \
+		-X github.com/ka1ne/template-doc-gen/internal/version.Commit=$$(git rev-parse --short HEAD 2>/dev/null || echo "unknown") \
+		-X github.com/ka1ne/template-doc-gen/internal/version.BuildDate=$$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
+		-X github.com/ka1ne/template-doc-gen/internal/version.GoVersion=$$(go version | cut -d ' ' -f 3)" \
+		-o $(BUILD_DIR)/$(BINARY_NAME) $(GO_MAIN)
 	@echo "Build successful. Binary location: $(BUILD_DIR)/$(BINARY_NAME)"
 
-# Run tests for core application
+# run tests
 .PHONY: test
 test: build
 	@echo "Running unit tests..."
 	go test -v ./pkg/...
 
-# Run quick validation test
+# run validation test
 .PHONY: test-validate
 test-validate: build
 	@echo "Running validation test..."
-	./$(BUILD_DIR)/$(BINARY_NAME) --source $(SOURCE_DIR) --output $(OUTPUT_DIR) --validate --verbose
+	./$(BUILD_DIR)/$(BINARY_NAME) validate --source $(SOURCE_DIR) $(if $(filter true,$(VERBOSE)),--verbose,)
 
-# Generate documentation
+# generate docs
 .PHONY: generate
 generate: build
 	@echo "Generating documentation from templates in $(SOURCE_DIR)..."
-	./$(BUILD_DIR)/$(BINARY_NAME) --source $(SOURCE_DIR) --output $(OUTPUT_DIR) --format $(FORMAT) $(if $(filter true,$(VERBOSE)),--verbose,) $(if $(filter true,$(VALIDATE_ONLY)),--validate,)
+	./$(BUILD_DIR)/$(BINARY_NAME) generate --source $(SOURCE_DIR) --output $(OUTPUT_DIR) --format $(FORMAT) $(if $(filter true,$(VERBOSE)),--verbose,)
 
-# Build Docker image (production)
+# build docker image
 .PHONY: docker-build
 docker-build:
 	@echo "Building Docker image $(DOCKER_IMAGE):$(DOCKER_TAG)..."
 	docker build -t $(DOCKER_IMAGE):$(DOCKER_TAG) .
 
-# Run in Docker (production)
+# run in docker
 .PHONY: docker-run
 docker-run:
 	@echo "Starting Harness Template Documentation Generator in Docker..."
@@ -85,7 +91,7 @@ docker-run:
 	@echo "Source directory: $(SOURCE_DIR)"
 	@echo "Output directory: $(OUTPUT_DIR)"
 	
-	@# Ensure output directory exists with proper permissions
+	@# ensure output dir exists with permissions
 	mkdir -p $(OUTPUT_DIR)
 	chmod 777 $(OUTPUT_DIR)
 	
@@ -97,11 +103,38 @@ docker-run:
 		$(if $(filter true,$(VERBOSE)),--verbose,) \
 		$(if $(filter true,$(VALIDATE_ONLY)),--validate,)
 
+# build pipeline image
+.PHONY: docker-build-pipeline
+docker-build-pipeline:
+	@echo "Building pipeline-optimized Docker image $(DOCKER_IMAGE):pipeline..."
+	docker build -f Dockerfile.pipeline \
+		--build-arg VERSION=$$(git describe --tags --always --dirty 2>/dev/null || echo "dev") \
+		--build-arg COMMIT=$$(git rev-parse --short HEAD 2>/dev/null || echo "unknown") \
+		--build-arg BUILD_DATE=$$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
+		-t $(DOCKER_IMAGE):pipeline .
+
+# test pipeline image
+.PHONY: test-pipeline-image
+test-pipeline-image: docker-build-pipeline
+	@echo "Testing pipeline Docker image..."
+	@echo "1. Testing help command:"
+	docker run --rm $(DOCKER_IMAGE):pipeline
+	@echo "\n2. Testing version command:"
+	docker run --rm $(DOCKER_IMAGE):pipeline version
+	@echo "\n3. Testing validate command with the example templates:"
+	docker run --rm -v $(PWD)/templates:/templates $(DOCKER_IMAGE):pipeline validate --source /templates
+	@echo "\n4. Testing generate command:"
+	mkdir -p $(OUTPUT_DIR)
+	docker run --rm \
+		-v $(PWD)/templates:/templates \
+		-v $(PWD)/$(OUTPUT_DIR):/output \
+		$(DOCKER_IMAGE):pipeline generate --source /templates --output /output
+
 ############################
-# Development Tools        #
+# dev tools               #
 ############################
 
-# Build the file server (development only)
+# build fileserver
 .PHONY: build-fileserver
 build-fileserver: dirs
 	@echo "Creating file server if it doesn't exist..."
@@ -113,24 +146,24 @@ build-fileserver: dirs
 	go build -o $(BUILD_DIR)/$(FILESERVER_BINARY) $(FILESERVER_MAIN)
 	@echo "File server built successfully."
 
-# Run server to preview documentation (development only)
+# serve docs locally
 .PHONY: serve
-serve: generate build-fileserver
+serve: build build-fileserver
 	@echo "Starting local server to preview documentation..."
 	@echo "Open your browser and navigate to http://localhost:8000/"
-	./$(BUILD_DIR)/$(FILESERVER_BINARY) -dir $(OUTPUT_DIR)
+	./$(BUILD_DIR)/$(BINARY_NAME) serve --dir=$(OUTPUT_DIR) --port=8000
 
-# Build development Docker image (includes dev tools)
+# build dev image
 .PHONY: docker-build-dev
 docker-build-dev:
 	@echo "Building development Docker image $(DOCKER_IMAGE):dev..."
 	docker build -f Dockerfile.dev -t $(DOCKER_IMAGE):dev .
 
 ############################
-# Help                     #
+# help                     #
 ############################
 
-# Help command
+# show help
 .PHONY: help
 help:
 	@echo "Harness Template Documentation Generator"

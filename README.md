@@ -112,12 +112,12 @@ make serve             # Generate docs and serve locally (development)
 make docker-build-dev  # Build development Docker image
 ```
 
-## ToDo
-- Improve test coverage
-- Add detailed schema validation
-- Add a "what's changed" section in generated documentation
-- Support additional output formats
+## roadmap
+- improve test coverage
+- add detailed schema validation
+- add a "what's changed" section in generated documentation
+- support additional output formats
 
-## Learn More
+## learn more
 
 For advanced usage, see the [Harness Schema](https://github.com/harness/harness-schema) documentation.

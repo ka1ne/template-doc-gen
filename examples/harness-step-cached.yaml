@@ -1,0 +1,133 @@
+template:
+  name: Template Documentation Generator (Cached)
+  identifier: template_doc_gen_cached
+  versionLabel: 1.0.0
+  type: Step
+  projectIdentifier: default
+  orgIdentifier: default
+  description: "Generate documentation from Harness templates with efficient caching support"
+  tags:
+    - documentation
+    - templates
+    - cached
+  variables:
+    sourceDir:
+      description: "Source directory containing template YAML files (use ${CACHE_DIR}/templates for caching)"
+      type: string
+      required: true
+      scope: step
+    outputDir:
+      description: "Output directory for generated documentation (use ${CACHE_DIR}/docs-output for caching)"
+      type: string
+      required: true
+      scope: step
+    hashFile:
+      description: "File to store template hash for cache validation (use ${CACHE_DIR}/markers/template-hash.txt)"
+      type: string
+      required: false
+      default: ""
+      scope: step
+  parameters:
+    format:
+      description: "Output format (html, json, markdown)"
+      type: string
+      required: false
+      default: "html"
+      scope: step
+    failOnValidationError:
+      description: "Fail the step if template validation fails"
+      type: boolean
+      required: false
+      default: true
+      scope: step
+    concurrency:
+      description: "Number of concurrent workers for processing templates"
+      type: number
+      required: false
+      default: 4
+      scope: step
+    skipIfCacheValid:
+      description: "Skip generation if cache is valid (based on template hash)"
+      type: boolean
+      required: false
+      default: true
+      scope: step
+    forceRegeneration:
+      description: "Force regeneration even if cache is valid"
+      type: boolean
+      required: false
+      default: false
+      scope: step
+  spec:
+    type: Plugin
+    spec:
+      connectorRef: <+input>
+      image: ka1ne/template-doc-gen:pipeline
+      shell: Bash
+      command: |
+        # Function to run the template documentation generator
+        run_tempdocs() {
+          CMD="$@"
+          echo "Executing: $CMD"
+          if ! $CMD; then
+            if [[ "${failOnValidationError}" == "true" ]]; then
+              echo "Error: Template documentation generation failed"
+              exit 1
+            else
+              echo "Warning: Template documentation generation issues found, but continuing as per configuration"
+            fi
+          fi
+        }
+        
+        # Add caching logic
+        if [[ "${skipIfCacheValid}" == "true" && "${forceRegeneration}" != "true" && -n "${hashFile}" ]]; then
+          # Generate current template hash
+          CURRENT_HASH=$(find "${sourceDir}" -type f -exec md5sum {} \; | sort | md5sum | cut -d ' ' -f 1)
+          echo "Current template hash: ${CURRENT_HASH}"
+          
+          # Check if we have a previous hash
+          if [[ -f "${hashFile}" ]]; then
+            PREVIOUS_HASH=$(cat "${hashFile}")
+            
+            if [[ "${CURRENT_HASH}" == "${PREVIOUS_HASH}" ]]; then
+              echo "Cache is valid: Templates unchanged since last generation"
+              echo "Skipping documentation generation (use forceRegeneration=true to override)"
+              exit 0
+            else
+              echo "Cache invalid: Templates have changed since last generation"
+            fi
+          else
+            echo "No previous hash found, documentation will be generated"
+          fi
+        else
+          if [[ "${forceRegeneration}" == "true" ]]; then
+            echo "Force regeneration enabled, ignoring cache"
+          fi
+        fi
+        
+        # 1. First validate the templates
+        run_tempdocs tempdocs validate --source "${sourceDir}" --concurrency ${concurrency}
+        
+        # 2. Then generate the documentation
+        run_tempdocs tempdocs generate --source "${sourceDir}" --output "${outputDir}" --format "${format}" --concurrency ${concurrency}
+        
+        # 3. Store template hash for cache validation if hash file specified
+        if [[ -n "${hashFile}" ]]; then
+          TEMPLATE_HASH=$(find "${sourceDir}" -type f -exec md5sum {} \; | sort | md5sum | cut -d ' ' -f 1)
+          echo "${TEMPLATE_HASH}" > "${hashFile}"
+          echo "Updated template hash stored at: ${hashFile}"
+        fi
+        
+        # 4. Display summary
+        echo "Documentation generation complete!"
+        echo "Output format: ${format}"
+        echo "Output files location: ${outputDir}"
+        
+        # List generated files
+        echo "Generated files:"
+        find "${outputDir}" -type f | sort
+      caching:
+        enabled: true
+        paths:
+          - ${outputDir}
+          - ${hashFile} 
