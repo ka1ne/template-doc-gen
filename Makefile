@@ -16,7 +16,7 @@ VERBOSE ?= false
 
 # docker settings
 DOCKER_IMAGE=ka1ne/template-doc-gen
-DOCKER_TAG=0.1.0-go
+DOCKER_TAG=1.0.0
 
 # load env file if exists
 ifneq (,$(wildcard .env))
@@ -80,14 +80,18 @@ generate: build
 # build docker image
 .PHONY: docker-build
 docker-build:
-	@echo "Building Docker image $(DOCKER_IMAGE):$(DOCKER_TAG)..."
-	docker build -t $(DOCKER_IMAGE):$(DOCKER_TAG) .
+	@echo "Building Docker image $(DOCKER_IMAGE):$(if $(TAG),$(TAG),$(DOCKER_TAG))..."
+	docker build -t $(DOCKER_IMAGE):$(or $(TAG),$(DOCKER_TAG)) \
+		--build-arg VERSION=$(or $(TAG),$(DOCKER_TAG)) \
+		--build-arg COMMIT=$$(git rev-parse --short HEAD 2>/dev/null || echo "unknown") \
+		--build-arg BUILD_DATE=$$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
+		.
 
 # run in docker
 .PHONY: docker-run
 docker-run:
 	@echo "Starting Harness Template Documentation Generator in Docker..."
-	@echo "Using Docker image: $(DOCKER_IMAGE):$(DOCKER_TAG)"
+	@echo "Using Docker image: $(DOCKER_IMAGE):$(if $(TAG),$(TAG),$(DOCKER_TAG))"
 	@echo "Source directory: $(SOURCE_DIR)"
 	@echo "Output directory: $(OUTPUT_DIR)"
 	
@@ -99,9 +103,71 @@ docker-run:
 		-v $(abspath $(SOURCE_DIR)):/app/templates \
 		-v $(abspath $(OUTPUT_DIR)):/app/docs \
 		--env-file .env \
-		$(DOCKER_IMAGE):$(DOCKER_TAG) \
+		$(DOCKER_IMAGE):$(or $(TAG),$(DOCKER_TAG)) \
 		$(if $(filter true,$(VERBOSE)),--verbose,) \
 		$(if $(filter true,$(VALIDATE_ONLY)),--validate,)
+
+# build multi-architecture docker images
+.PHONY: docker-buildx
+docker-buildx:
+	@echo "Building multi-architecture Docker images for $(DOCKER_IMAGE):$(if $(TAG),$(TAG),$(DOCKER_TAG))..."
+	docker buildx create --name tempdocs-builder --use --bootstrap || true
+	docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7 \
+		-f Dockerfile.multiarch \
+		--build-arg VERSION=$(or $(TAG),$(DOCKER_TAG)) \
+		--build-arg COMMIT=$$(git rev-parse --short HEAD 2>/dev/null || echo "unknown") \
+		--build-arg BUILD_DATE=$$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
+		-t $(DOCKER_IMAGE):$(or $(TAG),$(DOCKER_TAG)) \
+		--push .
+	@echo "Multi-architecture build complete and pushed to Docker Hub"
+
+# build multi-architecture docker images without pushing
+.PHONY: docker-buildx-local
+docker-buildx-local:
+	@echo "Building multi-architecture Docker images for local use..."
+	docker buildx create --name tempdocs-builder --use --bootstrap || true
+	docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7 \
+		-f Dockerfile.multiarch \
+		--build-arg VERSION=$(or $(TAG),$(DOCKER_TAG)) \
+		--build-arg COMMIT=$$(git rev-parse --short HEAD 2>/dev/null || echo "unknown") \
+		--build-arg BUILD_DATE=$$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
+		-t $(DOCKER_IMAGE):$(or $(TAG),$(DOCKER_TAG)) \
+		--load .
+	@echo "Multi-architecture build complete and loaded locally"
+
+# build and push all image variants
+.PHONY: docker-release-all
+docker-release-all: docker-buildx
+	@echo "Building and pushing all Docker image variants..."
+	
+	# Build and push pipeline image
+	docker buildx build --platform linux/amd64,linux/arm64 \
+		-f Dockerfile.pipeline \
+		--build-arg VERSION=$(or $(TAG),$(DOCKER_TAG)) \
+		--build-arg COMMIT=$$(git rev-parse --short HEAD 2>/dev/null || echo "unknown") \
+		--build-arg BUILD_DATE=$$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
+		-t $(DOCKER_IMAGE):pipeline \
+		--push .
+	
+	# Build and push development image
+	docker buildx build --platform linux/amd64,linux/arm64 \
+		-f Dockerfile.dev \
+		--build-arg VERSION=$(or $(TAG),$(DOCKER_TAG)) \
+		--build-arg COMMIT=$$(git rev-parse --short HEAD 2>/dev/null || echo "unknown") \
+		--build-arg BUILD_DATE=$$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
+		-t $(DOCKER_IMAGE):dev \
+		--push .
+	
+	# Tag the main version as latest as well
+	docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7 \
+		-f Dockerfile.multiarch \
+		--build-arg VERSION=$(or $(TAG),$(DOCKER_TAG)) \
+		--build-arg COMMIT=$$(git rev-parse --short HEAD 2>/dev/null || echo "unknown") \
+		--build-arg BUILD_DATE=$$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
+		-t $(DOCKER_IMAGE):latest \
+		--push .
+	
+	@echo "All Docker images built and pushed to Docker Hub"
 
 # build pipeline image
 .PHONY: docker-build-pipeline
@@ -179,6 +245,11 @@ help:
 	@echo "  generate       Generate documentation"
 	@echo "  docker-build   Build Docker image (production)"
 	@echo "  docker-run     Run using Docker (production)"
+	@echo "  docker-buildx  Build multi-architecture Docker images and push to Docker Hub"
+	@echo "  docker-buildx-local Build multi-architecture Docker images locally"
+	@echo "  docker-release-all Build and push all Docker image variants"
+	@echo "  release        Release a new version (includes build, test, generate, and docker publishing)"
+	@echo "  set-version    Update version across all files (Usage: make set-version TAG=x.y.z-suffix)"
 	@echo ""
 	@echo "Development Tools:"
 	@echo "  build-fileserver  Build the development file server"
@@ -190,4 +261,99 @@ help:
 	@echo "  OUTPUT_DIR     Output directory (default: $(OUTPUT_DIR))"
 	@echo "  FORMAT         Output format [html|json|markdown] (default: $(FORMAT))"
 	@echo "  VALIDATE_ONLY  Only validate templates (default: $(VALIDATE_ONLY))"
-	@echo "  VERBOSE        Enable verbose logging (default: $(VERBOSE))" 
+	@echo "  VERBOSE        Enable verbose logging (default: $(VERBOSE))"
+	@echo ""
+	@echo "Parameters:"
+	@echo "  TAG            Override the default tag ($(DOCKER_TAG)) for docker commands"
+	@echo "                 Example: make docker-build TAG=custom-tag"
+	@echo "                 Works with: docker-build, docker-run, docker-buildx, etc."
+
+# release a new version
+.PHONY: release
+release:
+	@echo "==========================================="
+	@echo "Releasing version $(if $(TAG),$(TAG),$(DOCKER_TAG))"
+	@echo "==========================================="
+	@echo ""
+	
+	# Build and run tests
+	@echo "Building and testing..."
+	$(MAKE) clean
+	$(MAKE) build
+	$(MAKE) test
+	
+	# Generate documentation
+	@echo "Generating documentation..."
+	$(MAKE) generate
+	
+	# Build and push Docker images
+	@echo "Building and pushing Docker images for all platforms..."
+	$(MAKE) docker-release-all TAG=$(or $(TAG),$(DOCKER_TAG))
+	
+	# Ask about git tag
+	@echo ""
+	@echo "Would you like to create and push a git tag for v$(if $(TAG),$(TAG),$(DOCKER_TAG))? [y/N]"
+	@read -r REPLY; \
+	if [ "$$REPLY" = "y" ] || [ "$$REPLY" = "Y" ]; then \
+		echo "Creating git tag v$(if $(TAG),$(TAG),$(DOCKER_TAG))..."; \
+		git tag -a "v$(if $(TAG),$(TAG),$(DOCKER_TAG))" -m "Release $(if $(TAG),$(TAG),$(DOCKER_TAG))"; \
+		echo "Pushing git tag..."; \
+		git push origin "v$(if $(TAG),$(TAG),$(DOCKER_TAG))"; \
+		echo "Git tag v$(if $(TAG),$(TAG),$(DOCKER_TAG)) created and pushed."; \
+	else \
+		echo "Skipping git tag creation."; \
+		echo "You can create it later with:"; \
+		echo "  git tag -a v$(if $(TAG),$(TAG),$(DOCKER_TAG)) -m \"Release $(if $(TAG),$(TAG),$(DOCKER_TAG))\""; \
+		echo "  git push origin v$(if $(TAG),$(TAG),$(DOCKER_TAG))"; \
+	fi
+	
+	# Success message
+	@echo ""
+	@echo "==========================================="
+	@echo "Release $(if $(TAG),$(TAG),$(DOCKER_TAG)) completed!"
+	@echo "==========================================="
+
+# update version across all files
+.PHONY: set-version
+set-version:
+	@if [ -z "$(TAG)" ]; then \
+		echo "Error: TAG parameter is required."; \
+		echo "Usage: make set-version TAG=x.y.z-suffix"; \
+		exit 1; \
+	fi
+	@echo "Updating version to $(TAG) across all files..."
+	
+	# Update version in internal/version/version.go
+	@sed -i 's/Version = ".*"/Version = "$(TAG)"/' internal/version/version.go
+	
+	# Update DOCKER_TAG in Makefile
+	@sed -i 's/DOCKER_TAG=1.0.0
+	
+	# Update version badge in README.md
+	@sed -i 's/version-.*-blue/version-$(subst .,\\.,$(TAG))-blue/' README.md
+	@sed -i 's/ka1ne\/template-doc-gen:.*\"/ka1ne\/template-doc-gen:$(TAG)\"/' README.md
+	@sed -i 's/versionLabel: v.*"/versionLabel: v$(TAG)"/' README.md
+	
+	# Update git tag commands in README.md
+	@sed -i 's/git tag -a v[0-9].*-m "Release [0-9].*"/git tag -a v$(TAG) -m "Release $(TAG)"/' README.md
+	@sed -i 's/git push origin v[0-9].*/git push origin v$(TAG)/' README.md
+	
+	# Update version in Dockerfiles
+	@sed -i 's/VERSION=.*/VERSION=$(TAG)/' Dockerfile
+	@sed -i 's/VERSION=.*/VERSION=$(TAG)/' Dockerfile.dev
+	@sed -i 's/VERSION=.*/VERSION=$(TAG)/' Dockerfile.pipeline
+	@sed -i 's/VERSION=.*/VERSION=$(TAG)/' Dockerfile.multiarch
+	@sed -i 's/org.opencontainers.image.version=".*/org.opencontainers.image.version="$(TAG)"/' Dockerfile.pipeline
+	@sed -i 's/org.opencontainers.image.version=".*/org.opencontainers.image.version="$(TAG)"/' Dockerfile.multiarch
+	
+	# Update examples directory if present
+	@if [ -d "examples" ]; then \
+		echo "Updating examples directory..."; \
+		find examples -type f -name "*.yaml" -exec sed -i 's/versionLabel: v[0-9].*"/versionLabel: v$(TAG)"/' {} \; ; \
+		find examples -type f -name "*.yaml" -exec sed -i 's/ka1ne\/template-doc-gen:[0-9].*/ka1ne\/template-doc-gen:$(TAG)/' {} \; ; \
+	fi
+	
+	@echo "Version updated to $(TAG) in all files."
+	@echo "Don't forget to commit these changes:"
+	@echo "  git add internal/version/version.go Makefile README.md Dockerfile* examples/"
+	@echo "  git commit -m \"Bump version to $(TAG)\"" 

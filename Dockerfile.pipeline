@@ -11,7 +11,7 @@ COPY cmd/ ./cmd/
 COPY pkg/ ./pkg/
 COPY internal/ ./internal/
 
-ARG VERSION=dev
+ARG VERSION=1.0.0
 ARG COMMIT=unknown
 ARG BUILD_DATE=unknown
 RUN CGO_ENABLED=0 GOOS=linux go build \
@@ -28,7 +28,7 @@ LABEL org.opencontainers.image.title="Harness Template Documentation Generator"
 LABEL org.opencontainers.image.description="Generate documentation for Harness templates"
 LABEL org.opencontainers.image.url="https://github.com/ka1ne/template-doc-gen"
 LABEL org.opencontainers.image.vendor="ka1ne"
-LABEL org.opencontainers.image.version="${VERSION}"
+LABEL org.opencontainers.image.version="1.0.0"
 LABEL org.opencontainers.image.created="${BUILD_DATE}"
 LABEL org.opencontainers.image.revision="${COMMIT}"
 
