@@ -20,6 +20,16 @@ var/
 .installed.cfg
 *.egg
 
+# Go
+/bin/
+/pkg/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+go.work
+
 # Virtual Environment
 venv/
 ENV/
@@ -69,3 +79,6 @@ docs/*
 
 # Local configuration
 .env.local 
+
+# Test output
+test_output/ 

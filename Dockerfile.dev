@@ -1,0 +1,41 @@
+# Development Dockerfile - includes development tools
+FROM golang:1.20-alpine
+
+LABEL version="dev"
+LABEL description="Development image for template-doc-gen with dev tools"
+
+WORKDIR /app
+
+# Install development tools
+RUN apk add --no-cache git make
+
+# Copy go.mod and go.sum first for better layer caching
+COPY go.mod go.sum* ./
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Build applications
+RUN go build -o /app/bin/tempdocs cmd/tempdocs/main.go && \
+    go build -o /app/bin/fileserver cmd/fileserver/main.go
+
+# Set environment variables
+ENV SOURCE_DIR=/app/templates \
+    OUTPUT_DIR=/app/docs/output \
+    FORMAT=html \
+    VERBOSE=true \
+    VALIDATE_ONLY=false \
+    PATH="/app/bin:${PATH}"
+
+# Create directories
+RUN mkdir -p /app/docs/output && chmod 777 /app/docs/output
+
+# Set working directory
+WORKDIR /app
+
+# Expose port for fileserver
+EXPOSE 8000
+
+# Default command
+CMD ["sh", "-c", "tempdocs --source ${SOURCE_DIR} --output ${OUTPUT_DIR} --format ${FORMAT} --verbose && fileserver -dir ${OUTPUT_DIR}"] 

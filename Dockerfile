@@ -1,35 +1,41 @@
-FROM python:3.10-slim
+# Build stage
+FROM golang:1.20-alpine AS builder
 
-LABEL maintainer="Kaine@enterpriseautomation.co.uk"
-LABEL version="0.0.3-alpha"
+LABEL version="0.1.0-go"
 
-
-# Set environment variables
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
-
-# Create app directory
 WORKDIR /app
 
-# Install dependencies first (for better layer caching)
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy go.mod and go.sum first for better layer caching
+COPY go.mod go.sum* ./
+RUN go mod download
 
-# Copy application files
-COPY . .
+# Copy only the necessary source code (exclude development tools)
+COPY cmd/tempdocs/ ./cmd/tempdocs/
+COPY pkg/ ./pkg/
 
-# Set up default configuration
+# Build the application with optimization flags
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /app/tempdocs cmd/tempdocs/main.go
+
+# Final stage - use distroless for minimal image size and security
+FROM gcr.io/distroless/static:nonroot
+
+# Set environment variables
 ENV SOURCE_DIR=/app/templates \
     OUTPUT_DIR=/app/docs/output \
     FORMAT=html \
     VERBOSE=false \
     VALIDATE_ONLY=false
 
-# Create output directory
-RUN mkdir -p /app/docs/output && chmod 777 /app/docs/output
+# Create app directories
+WORKDIR /app
+COPY --from=builder /app/tempdocs /app/
 
-# Define entrypoint and default command
-ENTRYPOINT ["python", "process_template.py"]
+# Documentation on expected volumes
+VOLUME ["/app/templates", "/app/docs"]
+
+# Expose port (if adding a server component in the future)
+EXPOSE 8000
+
+# Define entrypoint that accepts args
+ENTRYPOINT ["/app/tempdocs"]
 CMD ["--source", "/app/templates", "--output", "/app/docs/output", "--format", "html"] 
