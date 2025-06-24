@@ -52,6 +52,14 @@ func (p *Processor) ProcessTemplate(templatePath string, outputDir string, outpu
 		return nil, fmt.Errorf("error parsing YAML: %w", err)
 	}
 
+	// check for wildcard version and skip if found
+	if templateObj, ok := templateData["template"].(map[string]interface{}); ok {
+		if version, ok := templateObj["versionLabel"].(string); ok && strings.Contains(version, "x") {
+			p.logger.Infof("Skipping template with wildcard version: %s (version: %s)", templatePath, version)
+			return nil, fmt.Errorf("template skipped: contains wildcard version %s", version)
+		}
+	}
+
 	// validate template
 	if valid, msg := p.ValidateTemplate(templateData); !valid {
 		p.logger.Errorf("Template validation failed for %s: %s", templatePath, msg)
@@ -171,12 +179,18 @@ func (p *Processor) ProcessAllTemplates(templatesDir string, outputDir string, o
 	allMetadata := make([]*TemplateMetadata, 0, len(templateFiles))
 	validCount := 0
 	errorCount := 0
+	skippedCount := 0
 
 	for i := 0; i < len(templateFiles); i++ {
 		res := <-resultChan
 		if res.err != nil {
-			p.logger.Errorf("Error processing template %s: %v", res.path, res.err)
-			errorCount++
+			if strings.Contains(res.err.Error(), "template skipped: contains wildcard version") {
+				p.logger.Infof("Skipped template %s: %v", res.path, res.err)
+				skippedCount++
+			} else {
+				p.logger.Errorf("Error processing template %s: %v", res.path, res.err)
+				errorCount++
+			}
 		} else {
 			allMetadata = append(allMetadata, res.metadata)
 			validCount++
@@ -185,7 +199,7 @@ func (p *Processor) ProcessAllTemplates(templatesDir string, outputDir string, o
 
 	duration := time.Since(startTime).Seconds()
 	p.logger.Infof("Processing completed in %.2f seconds", duration)
-	p.logger.Infof("Templates processed: %d successful, %d failed", validCount, errorCount)
+	p.logger.Infof("Templates processed: %d successful, %d failed, %d skipped (wildcard versions)", validCount, errorCount, skippedCount)
 
 	//  note: Index generation and CSS generation would be handled by the Python service
 
